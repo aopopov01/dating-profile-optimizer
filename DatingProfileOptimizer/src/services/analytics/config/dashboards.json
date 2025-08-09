@@ -1,0 +1,488 @@
+{
+  "executive_dashboard": {
+    "dashboardId": "executive_dashboard",
+    "name": "Executive Dashboard",
+    "description": "High-level business metrics and KPIs for executive decision making",
+    "audience": "executive",
+    "refreshRate": 300000,
+    "widgets": [
+      {
+        "id": "revenue_overview",
+        "type": "metric",
+        "title": "Revenue Overview",
+        "description": "Total revenue, MRR, and growth metrics",
+        "dataSource": "business_metrics",
+        "query": "SELECT SUM(revenue) as total_revenue, AVG(mrr) as monthly_recurring_revenue FROM business_metrics WHERE date >= ?",
+        "visualization": {
+          "dimensions": ["date"],
+          "metrics": ["total_revenue", "monthly_recurring_revenue", "growth_rate"],
+          "colors": ["#2E86C1", "#28B463", "#F39C12"]
+        },
+        "size": "large",
+        "position": { "row": 1, "col": 1 }
+      },
+      {
+        "id": "user_acquisition",
+        "type": "chart",
+        "title": "User Acquisition Trends",
+        "description": "Daily and monthly active users, new registrations",
+        "dataSource": "user_events",
+        "query": "SELECT DATE(created_at) as date, COUNT(*) as new_users FROM users WHERE created_at >= ? GROUP BY DATE(created_at)",
+        "visualization": {
+          "chartType": "line",
+          "dimensions": ["date"],
+          "metrics": ["new_users", "active_users", "retained_users"],
+          "colors": ["#3498DB", "#E74C3C", "#9B59B6"]
+        },
+        "size": "medium",
+        "position": { "row": 1, "col": 2 }
+      },
+      {
+        "id": "conversion_funnel",
+        "type": "funnel",
+        "title": "Conversion Funnel",
+        "description": "User journey from signup to premium conversion",
+        "dataSource": "conversion_events",
+        "query": "SELECT funnel_step, COUNT(*) as users FROM conversion_events WHERE date >= ? GROUP BY funnel_step ORDER BY step_order",
+        "visualization": {
+          "dimensions": ["funnel_step"],
+          "metrics": ["users", "conversion_rate"],
+          "colors": ["#1ABC9C", "#3498DB", "#9B59B6", "#E74C3C"]
+        },
+        "size": "medium",
+        "position": { "row": 2, "col": 1 }
+      },
+      {
+        "id": "customer_metrics",
+        "type": "metric",
+        "title": "Customer Metrics",
+        "description": "LTV, CAC, and churn metrics",
+        "dataSource": "customer_metrics",
+        "query": "SELECT AVG(lifetime_value) as ltv, AVG(acquisition_cost) as cac, AVG(churn_rate) as churn FROM customer_metrics WHERE date >= ?",
+        "visualization": {
+          "dimensions": ["metric_type"],
+          "metrics": ["ltv", "cac", "churn_rate"],
+          "colors": ["#27AE60", "#E67E22", "#E74C3C"]
+        },
+        "size": "medium",
+        "position": { "row": 2, "col": 2 }
+      }
+    ],
+    "filters": [
+      {
+        "id": "date_range",
+        "name": "Date Range",
+        "type": "date",
+        "values": ["7d", "30d", "90d", "1y"],
+        "defaultValue": "30d",
+        "required": true
+      },
+      {
+        "id": "user_segment",
+        "name": "User Segment",
+        "type": "category",
+        "values": ["all", "new", "returning", "premium"],
+        "defaultValue": "all",
+        "required": false
+      }
+    ],
+    "alerts": [
+      {
+        "id": "revenue_drop",
+        "name": "Revenue Drop Alert",
+        "condition": "revenue_change < -0.15",
+        "threshold": -0.15,
+        "severity": "critical",
+        "channels": ["email", "slack", "webhook"],
+        "recipients": ["ceo@company.com", "cfo@company.com"],
+        "enabled": true
+      },
+      {
+        "id": "churn_spike",
+        "name": "Churn Rate Spike",
+        "condition": "churn_rate > 0.08",
+        "threshold": 0.08,
+        "severity": "warning",
+        "channels": ["email", "slack"],
+        "recipients": ["product@company.com", "customer-success@company.com"],
+        "enabled": true
+      }
+    ]
+  },
+  "product_dashboard": {
+    "dashboardId": "product_dashboard",
+    "name": "Product Analytics Dashboard",
+    "description": "Feature usage, user engagement, and AI performance metrics",
+    "audience": "product",
+    "refreshRate": 60000,
+    "widgets": [
+      {
+        "id": "feature_usage",
+        "type": "chart",
+        "title": "Feature Usage",
+        "description": "Usage statistics for key features",
+        "dataSource": "feature_events",
+        "query": "SELECT feature_name, COUNT(*) as usage_count FROM feature_events WHERE date >= ? GROUP BY feature_name",
+        "visualization": {
+          "chartType": "bar",
+          "dimensions": ["feature_name"],
+          "metrics": ["usage_count", "unique_users"],
+          "colors": ["#3498DB", "#E74C3C"]
+        },
+        "size": "large",
+        "position": { "row": 1, "col": 1 }
+      },
+      {
+        "id": "ai_performance",
+        "type": "metric",
+        "title": "AI Model Performance",
+        "description": "Accuracy, response time, and user satisfaction",
+        "dataSource": "ai_metrics",
+        "query": "SELECT AVG(accuracy) as avg_accuracy, AVG(response_time) as avg_response_time, AVG(user_satisfaction) as satisfaction FROM ai_metrics WHERE date >= ?",
+        "visualization": {
+          "dimensions": ["model_type"],
+          "metrics": ["accuracy", "response_time", "user_satisfaction"],
+          "colors": ["#27AE60", "#F39C12", "#9B59B6"]
+        },
+        "size": "medium",
+        "position": { "row": 1, "col": 2 }
+      },
+      {
+        "id": "user_journey",
+        "type": "heatmap",
+        "title": "User Journey Heatmap",
+        "description": "Screen transitions and user flow analysis",
+        "dataSource": "screen_events",
+        "query": "SELECT from_screen, to_screen, COUNT(*) as transition_count FROM screen_transitions WHERE date >= ? GROUP BY from_screen, to_screen",
+        "visualization": {
+          "dimensions": ["from_screen", "to_screen"],
+          "metrics": ["transition_count"],
+          "colors": ["#E8F8F5", "#A9DFBF", "#52C9A9", "#27AE60"]
+        },
+        "size": "large",
+        "position": { "row": 2, "col": 1 }
+      }
+    ],
+    "filters": [
+      {
+        "id": "date_range",
+        "name": "Date Range",
+        "type": "date",
+        "values": ["1d", "7d", "30d"],
+        "defaultValue": "7d",
+        "required": true
+      },
+      {
+        "id": "platform",
+        "name": "Platform",
+        "type": "category",
+        "values": ["all", "ios", "android"],
+        "defaultValue": "all",
+        "required": false
+      }
+    ],
+    "alerts": [
+      {
+        "id": "ai_accuracy_drop",
+        "name": "AI Accuracy Drop",
+        "condition": "ai_accuracy < 0.85",
+        "threshold": 0.85,
+        "severity": "warning",
+        "channels": ["email", "slack"],
+        "recipients": ["ai-team@company.com", "product@company.com"],
+        "enabled": true
+      }
+    ]
+  },
+  "marketing_dashboard": {
+    "dashboardId": "marketing_dashboard",
+    "name": "Marketing Performance Dashboard",
+    "description": "Campaign performance, attribution, and growth metrics",
+    "audience": "marketing",
+    "refreshRate": 180000,
+    "widgets": [
+      {
+        "id": "campaign_performance",
+        "type": "table",
+        "title": "Campaign Performance",
+        "description": "Performance metrics by marketing campaign",
+        "dataSource": "campaign_metrics",
+        "query": "SELECT campaign_name, SUM(impressions) as impressions, SUM(clicks) as clicks, SUM(conversions) as conversions, SUM(cost) as cost, AVG(ctr) as ctr, AVG(cpa) as cpa FROM campaign_metrics WHERE date >= ? GROUP BY campaign_name",
+        "visualization": {
+          "dimensions": ["campaign_name"],
+          "metrics": ["impressions", "clicks", "conversions", "cost", "ctr", "cpa", "roas"],
+          "colors": ["#3498DB"]
+        },
+        "size": "large",
+        "position": { "row": 1, "col": 1 }
+      },
+      {
+        "id": "attribution_model",
+        "type": "chart",
+        "title": "Multi-Touch Attribution",
+        "description": "Revenue attribution across marketing channels",
+        "dataSource": "attribution_data",
+        "query": "SELECT channel, SUM(attributed_revenue) as revenue FROM attribution_data WHERE date >= ? GROUP BY channel",
+        "visualization": {
+          "chartType": "pie",
+          "dimensions": ["channel"],
+          "metrics": ["attributed_revenue"],
+          "colors": ["#E74C3C", "#3498DB", "#F39C12", "#27AE60", "#9B59B6"]
+        },
+        "size": "medium",
+        "position": { "row": 1, "col": 2 }
+      },
+      {
+        "id": "organic_growth",
+        "type": "chart",
+        "title": "Organic Growth",
+        "description": "Organic user acquisition and viral metrics",
+        "dataSource": "organic_metrics",
+        "query": "SELECT DATE(date) as date, organic_signups, viral_coefficient, brand_mentions FROM organic_metrics WHERE date >= ?",
+        "visualization": {
+          "chartType": "line",
+          "dimensions": ["date"],
+          "metrics": ["organic_signups", "viral_coefficient", "brand_mentions"],
+          "colors": ["#27AE60", "#F39C12", "#9B59B6"]
+        },
+        "size": "medium",
+        "position": { "row": 2, "col": 1 }
+      }
+    ],
+    "filters": [
+      {
+        "id": "date_range",
+        "name": "Date Range",
+        "type": "date",
+        "values": ["7d", "30d", "90d"],
+        "defaultValue": "30d",
+        "required": true
+      },
+      {
+        "id": "channel",
+        "name": "Marketing Channel",
+        "type": "category",
+        "values": ["all", "google", "facebook", "instagram", "tiktok", "organic"],
+        "defaultValue": "all",
+        "required": false
+      }
+    ],
+    "alerts": [
+      {
+        "id": "high_cpa",
+        "name": "High Cost Per Acquisition",
+        "condition": "cpa > 50",
+        "threshold": 50,
+        "severity": "warning",
+        "channels": ["email"],
+        "recipients": ["marketing@company.com"],
+        "enabled": true
+      }
+    ]
+  },
+  "linkedin_dashboard": {
+    "dashboardId": "linkedin_dashboard",
+    "name": "LinkedIn Headshot Analytics",
+    "description": "Professional networking and career impact metrics",
+    "audience": "product",
+    "refreshRate": 300000,
+    "widgets": [
+      {
+        "id": "professional_metrics",
+        "type": "metric",
+        "title": "Professional Impact Metrics",
+        "description": "Profile views, network growth, and career outcomes",
+        "dataSource": "professional_metrics",
+        "query": "SELECT AVG(profile_view_increase) as avg_profile_views, AVG(connection_acceptance_rate) as connection_rate, AVG(recruiter_inquiries) as recruiter_interest FROM professional_metrics WHERE date >= ?",
+        "visualization": {
+          "dimensions": ["metric_type"],
+          "metrics": ["profile_view_increase", "connection_acceptance_rate", "recruiter_inquiries"],
+          "colors": ["#0077B5", "#00A0DC", "#313335"]
+        },
+        "size": "large",
+        "position": { "row": 1, "col": 1 }
+      },
+      {
+        "id": "industry_breakdown",
+        "type": "chart",
+        "title": "Industry Analysis",
+        "description": "Usage and success metrics by professional industry",
+        "dataSource": "industry_metrics",
+        "query": "SELECT industry, COUNT(*) as user_count, AVG(quality_score) as avg_quality, AVG(conversion_rate) as conversion FROM industry_metrics WHERE date >= ? GROUP BY industry",
+        "visualization": {
+          "chartType": "bar",
+          "dimensions": ["industry"],
+          "metrics": ["user_count", "avg_quality", "conversion_rate"],
+          "colors": ["#0077B5", "#00A0DC", "#313335"]
+        },
+        "size": "medium",
+        "position": { "row": 1, "col": 2 }
+      },
+      {
+        "id": "network_effects",
+        "type": "chart",
+        "title": "Network Effects & Viral Growth",
+        "description": "TA connections, referrals, and viral coefficient",
+        "dataSource": "network_metrics",
+        "query": "SELECT DATE(date) as date, total_connections, referrals, viral_coefficient FROM network_metrics WHERE date >= ?",
+        "visualization": {
+          "chartType": "area",
+          "dimensions": ["date"],
+          "metrics": ["total_connections", "referrals", "viral_coefficient"],
+          "colors": ["#0077B5", "#00A0DC", "#7FC15E"]
+        },
+        "size": "large",
+        "position": { "row": 2, "col": 1 }
+      },
+      {
+        "id": "brand_alignment",
+        "type": "heatmap",
+        "title": "Brand Alignment by Industry",
+        "description": "Brand consistency scores across different industries",
+        "dataSource": "brand_metrics",
+        "query": "SELECT industry, company_size, AVG(brand_consistency) as alignment_score FROM brand_metrics WHERE date >= ? GROUP BY industry, company_size",
+        "visualization": {
+          "dimensions": ["industry", "company_size"],
+          "metrics": ["alignment_score"],
+          "colors": ["#F8F9FA", "#DEE2E6", "#ADB5BD", "#6C757D", "#495057"]
+        },
+        "size": "medium",
+        "position": { "row": 2, "col": 2 }
+      }
+    ],
+    "filters": [
+      {
+        "id": "date_range",
+        "name": "Date Range",
+        "type": "date",
+        "values": ["30d", "90d", "180d", "1y"],
+        "defaultValue": "90d",
+        "required": true
+      },
+      {
+        "id": "industry",
+        "name": "Industry",
+        "type": "category",
+        "values": ["all", "technology", "finance", "consulting", "healthcare", "marketing"],
+        "defaultValue": "all",
+        "required": false
+      },
+      {
+        "id": "professional_level",
+        "name": "Professional Level",
+        "type": "category",
+        "values": ["all", "entry", "mid", "senior", "executive", "entrepreneur"],
+        "defaultValue": "all",
+        "required": false
+      }
+    ],
+    "alerts": [
+      {
+        "id": "low_network_growth",
+        "name": "Low Network Growth",
+        "condition": "viral_coefficient < 1.5",
+        "threshold": 1.5,
+        "severity": "info",
+        "channels": ["email"],
+        "recipients": ["product@company.com"],
+        "enabled": true
+      }
+    ]
+  },
+  "operational_dashboard": {
+    "dashboardId": "operational_dashboard",
+    "name": "Operational Metrics Dashboard",
+    "description": "System performance, reliability, and operational health",
+    "audience": "operations",
+    "refreshRate": 30000,
+    "widgets": [
+      {
+        "id": "app_performance",
+        "type": "metric",
+        "title": "Application Performance",
+        "description": "Response times, error rates, and system health",
+        "dataSource": "performance_metrics",
+        "query": "SELECT AVG(response_time) as avg_response_time, AVG(error_rate) as error_rate, AVG(uptime) as uptime FROM performance_metrics WHERE timestamp >= ?",
+        "visualization": {
+          "dimensions": ["metric_type"],
+          "metrics": ["response_time", "error_rate", "uptime", "cpu_usage", "memory_usage"],
+          "colors": ["#27AE60", "#E74C3C", "#3498DB", "#F39C12", "#9B59B6"]
+        },
+        "size": "large",
+        "position": { "row": 1, "col": 1 }
+      },
+      {
+        "id": "error_tracking",
+        "type": "chart",
+        "title": "Error Tracking",
+        "description": "Error rates and crash analytics",
+        "dataSource": "error_metrics",
+        "query": "SELECT DATE(timestamp) as date, COUNT(*) as error_count, error_type FROM error_metrics WHERE timestamp >= ? GROUP BY DATE(timestamp), error_type",
+        "visualization": {
+          "chartType": "line",
+          "dimensions": ["date"],
+          "metrics": ["error_count"],
+          "colors": ["#E74C3C", "#EC7063", "#F1948A"]
+        },
+        "size": "medium",
+        "position": { "row": 1, "col": 2 }
+      },
+      {
+        "id": "resource_usage",
+        "type": "chart",
+        "title": "Resource Usage",
+        "description": "CPU, memory, and network utilization",
+        "dataSource": "resource_metrics",
+        "query": "SELECT timestamp, cpu_usage, memory_usage, network_usage FROM resource_metrics WHERE timestamp >= ?",
+        "visualization": {
+          "chartType": "area",
+          "dimensions": ["timestamp"],
+          "metrics": ["cpu_usage", "memory_usage", "network_usage"],
+          "colors": ["#3498DB", "#E74C3C", "#F39C12"]
+        },
+        "size": "large",
+        "position": { "row": 2, "col": 1 }
+      }
+    ],
+    "filters": [
+      {
+        "id": "time_range",
+        "name": "Time Range",
+        "type": "date",
+        "values": ["1h", "6h", "24h", "7d"],
+        "defaultValue": "6h",
+        "required": true
+      },
+      {
+        "id": "environment",
+        "name": "Environment",
+        "type": "category",
+        "values": ["all", "production", "staging", "development"],
+        "defaultValue": "production",
+        "required": false
+      }
+    ],
+    "alerts": [
+      {
+        "id": "high_error_rate",
+        "name": "High Error Rate",
+        "condition": "error_rate > 0.05",
+        "threshold": 0.05,
+        "severity": "critical",
+        "channels": ["email", "slack", "webhook"],
+        "recipients": ["devops@company.com", "engineering@company.com"],
+        "enabled": true
+      },
+      {
+        "id": "high_cpu_usage",
+        "name": "High CPU Usage",
+        "condition": "cpu_usage > 80",
+        "threshold": 80,
+        "severity": "warning",
+        "channels": ["slack"],
+        "recipients": ["devops@company.com"],
+        "enabled": true
+      }
+    ]
+  }
+}

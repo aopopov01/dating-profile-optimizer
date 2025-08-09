@@ -1,0 +1,381 @@
+name: Dating Profile Optimizer Backend CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths: [ 'backend/**' ]
+  pull_request:
+    branches: [ main, develop ]
+    paths: [ 'backend/**' ]
+
+env:
+  NODE_VERSION: '18'
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: production/dating-optimizer/backend
+
+jobs:
+  test:
+    name: Run Tests and Quality Checks
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dating_optimizer_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: backend/package-lock.json
+
+    - name: Install dependencies
+      run: |
+        cd backend
+        npm ci
+
+    - name: Run database migrations
+      env:
+        NODE_ENV: test
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dating_optimizer_test
+      run: |
+        cd backend
+        npm run migrate
+
+    - name: Run TypeScript check
+      run: |
+        cd backend
+        npx tsc --noEmit
+
+    - name: Run ESLint
+      run: |
+        cd backend
+        npm run lint
+
+    - name: Run Prettier check
+      run: |
+        cd backend
+        npm run format:check
+
+    - name: Run unit tests
+      env:
+        NODE_ENV: test
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dating_optimizer_test
+        JWT_SECRET: test-jwt-secret
+        OPENAI_API_KEY: test-openai-key
+      run: |
+        cd backend
+        npm run test:unit
+
+    - name: Run integration tests
+      env:
+        NODE_ENV: test
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dating_optimizer_test
+        JWT_SECRET: test-jwt-secret
+        OPENAI_API_KEY: test-openai-key
+      run: |
+        cd backend
+        npm run test:integration
+
+    - name: Generate test coverage
+      env:
+        NODE_ENV: test
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dating_optimizer_test
+        JWT_SECRET: test-jwt-secret
+        OPENAI_API_KEY: test-openai-key
+      run: |
+        cd backend
+        npm run test:coverage
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        directory: backend/coverage
+        fail_ci_if_error: true
+        flags: backend
+
+    - name: SonarCloud Scan
+      uses: SonarSource/sonarcloud-github-action@master
+      with:
+        projectBaseDir: backend
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  security-scan:
+    name: Security & Vulnerability Scans
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run npm audit
+      run: |
+        cd backend
+        npm audit --audit-level moderate
+
+    - name: Run Trivy filesystem scan
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: 'backend/'
+        format: 'sarif'
+        output: 'trivy-fs-results.sarif'
+
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-fs-results.sarif'
+
+    - name: Run Snyk to check for vulnerabilities
+      uses: snyk/actions/node@master
+      continue-on-error: true
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      with:
+        args: --file=backend/package.json --severity-threshold=high
+
+  build-and-push:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    needs: [test, security-scan]
+    if: github.event_name == 'push'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v4
+      with:
+        images: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v4
+      with:
+        context: ./backend
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        platforms: linux/amd64,linux/arm64
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        build-args: |
+          NODE_ENV=production
+          BUILD_DATE=${{ steps.meta.outputs.labels }}
+          VCS_REF=${{ github.sha }}
+
+    - name: Scan Docker image
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+        format: 'sarif'
+        output: 'trivy-image-results.sarif'
+
+    - name: Upload image scan results
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-image-results.sarif'
+
+  deploy:
+    name: Deploy to Environment
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Update kubeconfig
+      run: aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name mobile-apps-cluster
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+
+    - name: Set environment variables
+      id: env
+      run: |
+        if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+          echo "ENVIRONMENT=production" >> $GITHUB_OUTPUT
+          echo "NAMESPACE=dating-optimizer-production" >> $GITHUB_OUTPUT
+        else
+          echo "ENVIRONMENT=staging" >> $GITHUB_OUTPUT
+          echo "NAMESPACE=dating-optimizer-staging" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Deploy to Kubernetes
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.ref == 'refs/heads/main' && 'main' || 'develop' }}-${{ github.sha }}
+        ENVIRONMENT: ${{ steps.env.outputs.ENVIRONMENT }}
+        NAMESPACE: ${{ steps.env.outputs.NAMESPACE }}
+      run: |
+        # Create namespace if it doesn't exist
+        kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+        
+        # Apply Kubernetes manifests
+        envsubst < k8s/backend/deployment.yaml | kubectl apply -f -
+        kubectl apply -f k8s/backend/service.yaml -n $NAMESPACE
+        kubectl apply -f k8s/backend/hpa.yaml -n $NAMESPACE
+        
+        # Update deployment with new image
+        kubectl set image deployment/dating-optimizer-backend \
+          dating-optimizer-backend=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+          -n $NAMESPACE
+        
+        # Wait for rollout to complete
+        kubectl rollout status deployment/dating-optimizer-backend -n $NAMESPACE --timeout=600s
+
+    - name: Run health checks
+      env:
+        NAMESPACE: ${{ steps.env.outputs.NAMESPACE }}
+        ENVIRONMENT: ${{ steps.env.outputs.ENVIRONMENT }}
+      run: |
+        # Get service endpoint
+        echo "Waiting for load balancer to be ready..."
+        kubectl wait --for=condition=ready service/dating-optimizer-backend-service -n $NAMESPACE --timeout=300s
+        
+        SERVICE_URL=$(kubectl get service dating-optimizer-backend-service -n $NAMESPACE -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+        
+        if [ -z "$SERVICE_URL" ]; then
+          SERVICE_URL=$(kubectl get service dating-optimizer-backend-service -n $NAMESPACE -o jsonpath='{.spec.clusterIP}')
+          kubectl port-forward service/dating-optimizer-backend-service 8080:80 -n $NAMESPACE &
+          SERVICE_URL="localhost:8080"
+        fi
+        
+        echo "Running health checks against $SERVICE_URL"
+        
+        # Wait for service to respond
+        timeout 300 bash -c "until curl -f -s http://$SERVICE_URL/health > /dev/null; do echo 'Waiting for service...'; sleep 5; done"
+        
+        # Run comprehensive health checks
+        echo "✅ Basic health check..."
+        curl -f -s http://$SERVICE_URL/health | jq -e '.status == "ok"'
+        
+        echo "✅ API status check..."
+        curl -f -s http://$SERVICE_URL/api/v1/status | jq -e '.status == "ok"'
+        
+        echo "✅ Database connectivity check..."
+        curl -f -s http://$SERVICE_URL/api/v1/health/database | jq -e '.status == "ok"'
+        
+        echo "All health checks passed! 🎉"
+
+  performance-test:
+    name: Performance Testing
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: github.ref == 'refs/heads/develop'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Update kubeconfig
+      run: aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name mobile-apps-cluster
+
+    - name: Get service endpoint
+      id: service
+      run: |
+        SERVICE_URL=$(kubectl get service dating-optimizer-backend-service -n dating-optimizer-staging -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+        echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_OUTPUT
+
+    - name: Run k6 performance tests
+      uses: grafana/k6-action@v0.3.1
+      with:
+        filename: tests/performance/backend-load-test.js
+      env:
+        BASE_URL: http://${{ steps.service.outputs.SERVICE_URL }}
+
+  notify:
+    name: Notify Teams
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    if: always()
+
+    steps:
+    - name: Notify Slack on Success
+      if: needs.deploy.result == 'success'
+      uses: 8398a7/action-slack@v3
+      with:
+        status: success
+        text: |
+          🚀 Dating Profile Optimizer Backend deployed successfully!
+          Environment: ${{ github.ref == 'refs/heads/main' && 'Production' || 'Staging' }}
+          Branch: ${{ github.ref_name }}
+          Commit: ${{ github.sha }}
+          Author: ${{ github.actor }}
+        webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+    - name: Notify Slack on Failure
+      if: needs.deploy.result == 'failure'
+      uses: 8398a7/action-slack@v3
+      with:
+        status: failure
+        text: |
+          💥 Dating Profile Optimizer Backend deployment failed!
+          Environment: ${{ github.ref == 'refs/heads/main' && 'Production' || 'Staging' }}
+          Branch: ${{ github.ref_name }}
+          Commit: ${{ github.sha }}
+          Author: ${{ github.actor }}
+        webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+    - name: Create GitHub deployment status
+      uses: chrnorm/deployment-status@v2
+      if: always()
+      with:
+        token: '${{ github.token }}'
+        state: ${{ needs.deploy.result == 'success' && 'success' || 'failure' }}
+        deployment-id: ${{ github.run_id }}
+        environment-url: ${{ format('https://{0}.{1}', github.ref == 'refs/heads/main' && 'api' || 'staging-api', secrets.DOMAIN_NAME) }}

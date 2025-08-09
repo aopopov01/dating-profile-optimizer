@@ -1,0 +1,420 @@
+name: Dating Profile Optimizer CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop, staging]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  NODE_VERSION: '18.x'
+  JAVA_VERSION: '17'
+  RUBY_VERSION: '3.1'
+
+jobs:
+  # Security scanning and code quality
+  security-scan:
+    name: Security & Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run dependency audit
+        run: npm audit --audit-level high
+
+  # Mobile app testing
+  mobile-tests:
+    name: Mobile Tests
+    runs-on: ubuntu-latest
+    needs: security-scan
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Jest tests
+        run: npm test -- --coverage --watchAll=false
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/clover.xml
+          fail_ci_if_error: true
+
+  # Backend API testing
+  backend-tests:
+    name: Backend API Tests
+    runs-on: ubuntu-latest
+    needs: security-scan
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: dating_optimizer_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: ./backend
+        run: npm ci
+
+      - name: Run database migrations
+        working-directory: ./backend
+        run: npm run migrate
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: dating_optimizer_test
+          DB_USER: postgres
+          DB_PASSWORD: testpassword
+
+      - name: Run backend tests
+        working-directory: ./backend
+        run: npm test -- --coverage
+        env:
+          NODE_ENV: test
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: dating_optimizer_test
+          DB_USER: postgres
+          DB_PASSWORD: testpassword
+          REDIS_URL: redis://localhost:6379
+
+  # Android build
+  android-build:
+    name: Android Build
+    runs-on: ubuntu-latest
+    needs: [mobile-tests, backend-tests]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Make gradlew executable
+        run: chmod +x ./android/gradlew
+
+      - name: Build Android APK
+        working-directory: ./android
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Sign APK
+        uses: r0adkll/sign-android-release@v1
+        if: github.ref == 'refs/heads/main'
+        id: sign_app
+        with:
+          releaseDirectory: android/app/build/outputs/apk/release
+          signingKeyBase64: ${{ secrets.ANDROID_SIGNING_KEY }}
+          alias: ${{ secrets.ANDROID_ALIAS }}
+          keyStorePassword: ${{ secrets.ANDROID_KEY_STORE_PASSWORD }}
+          keyPassword: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dating-optimizer-android-${{ github.run_number }}
+          path: android/app/build/outputs/apk/release/*.apk
+
+  # iOS build
+  ios-build:
+    name: iOS Build
+    runs-on: macos-latest
+    needs: [mobile-tests, backend-tests]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ env.RUBY_VERSION }}
+          bundler-cache: true
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install CocoaPods
+        run: |
+          cd ios
+          pod install
+
+      - name: Build iOS app
+        run: |
+          cd ios
+          xcodebuild -workspace DatingProfileOptimizer.xcworkspace \
+                     -scheme DatingProfileOptimizer \
+                     -configuration Release \
+                     -destination 'generic/platform=iOS' \
+                     -archivePath $PWD/build/DatingProfileOptimizer.xcarchive \
+                     archive
+
+      - name: Upload iOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dating-optimizer-ios-${{ github.run_number }}
+          path: ios/build/*.xcarchive
+
+  # Docker build and push
+  docker-build:
+    name: Docker Build & Push
+    runs-on: ubuntu-latest
+    needs: [android-build, ios-build]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
+    strategy:
+      matrix:
+        service: [backend]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+        env:
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.ECR_REGISTRY }}/dating-optimizer-${{ matrix.service }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./${{ matrix.service }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+  # Deploy to staging
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: docker-build
+    if: github.ref == 'refs/heads/staging'
+    environment:
+      name: staging
+      url: https://staging-api.datingoptimizer.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Deploy to EKS staging
+        run: |
+          aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name dating-optimizer-staging
+          
+          # Update image tags in Kubernetes manifests
+          sed -i 's|IMAGE_TAG|staging-${{ github.sha }}|g' k8s/backend/deployment.yaml
+          
+          # Apply Kubernetes manifests
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/backend/ -n dating-optimizer-staging
+          
+          # Wait for rollout to complete
+          kubectl rollout status deployment/backend -n dating-optimizer-staging --timeout=600s
+
+      - name: Run smoke tests
+        run: |
+          # Wait for service to be ready
+          kubectl wait --for=condition=ready pod -l app=backend -n dating-optimizer-staging --timeout=300s
+          
+          # Get service URL
+          STAGING_URL=$(kubectl get ingress backend-ingress -n dating-optimizer-staging -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          
+          # Run basic health checks
+          curl -f "https://${STAGING_URL}/health" || exit 1
+          curl -f "https://${STAGING_URL}/api/v1/status" || exit 1
+
+  # Deploy to production
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: docker-build
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://api.datingoptimizer.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Deploy to EKS production
+        run: |
+          aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name dating-optimizer-production
+          
+          # Update image tags in Kubernetes manifests
+          sed -i 's|IMAGE_TAG|main-${{ github.sha }}|g' k8s/backend/deployment.yaml
+          
+          # Apply Kubernetes manifests with rolling deployment
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/backend/ -n dating-optimizer-production
+          
+          # Wait for rollout to complete
+          kubectl rollout status deployment/backend -n dating-optimizer-production --timeout=600s
+
+      - name: Run production health checks
+        run: |
+          # Wait for service to be ready
+          kubectl wait --for=condition=ready pod -l app=backend -n dating-optimizer-production --timeout=300s
+          
+          # Run comprehensive health checks
+          PROD_URL=$(kubectl get ingress backend-ingress -n dating-optimizer-production -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          
+          # Health checks
+          curl -f "https://${PROD_URL}/health" || exit 1
+          curl -f "https://${PROD_URL}/api/v1/status" || exit 1
+          
+          # Performance check - response time should be under 500ms
+          RESPONSE_TIME=$(curl -o /dev/null -s -w '%{time_total}' "https://${PROD_URL}/api/v1/status")
+          if (( $(echo "$RESPONSE_TIME > 0.5" | bc -l) )); then
+            echo "Response time ${RESPONSE_TIME}s exceeds 500ms threshold"
+            exit 1
+          fi
+
+  # Notify deployment status
+  notify:
+    name: Notify Deployment Status
+    runs-on: ubuntu-latest
+    needs: [deploy-staging, deploy-production]
+    if: always()
+    steps:
+      - name: Notify Slack on success
+        if: success()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          text: 'Dating Profile Optimizer deployment successful!'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify Slack on failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          text: 'Dating Profile Optimizer deployment failed!'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

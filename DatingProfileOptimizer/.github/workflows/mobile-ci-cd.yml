@@ -1,0 +1,417 @@
+name: Dating Profile Optimizer Mobile CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths: [ 'src/**', 'android/**', 'ios/**', 'package.json', 'package-lock.json' ]
+  pull_request:
+    branches: [ main, develop ]
+    paths: [ 'src/**', 'android/**', 'ios/**', 'package.json', 'package-lock.json' ]
+
+env:
+  NODE_VERSION: '18'
+  JAVA_VERSION: '17'
+  RUBY_VERSION: '3.0'
+
+jobs:
+  test:
+    name: Run Tests and Code Quality
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run TypeScript check
+      run: npx tsc --noEmit
+
+    - name: Run ESLint
+      run: npm run lint
+
+    - name: Run Prettier check
+      run: npm run format:check
+
+    - name: Run unit tests
+      run: npm run test:unit
+
+    - name: Run component tests
+      run: npm run test:components
+
+    - name: Generate test coverage
+      run: npm run test:coverage
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        directory: coverage
+        fail_ci_if_error: true
+        flags: mobile
+
+    - name: Run Metro bundler check
+      run: |
+        npm start -- --reset-cache &
+        METRO_PID=$!
+        sleep 30
+        curl -f http://localhost:8081/status
+        kill $METRO_PID
+
+  android-build:
+    name: Android Build and Test
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: ${{ env.JAVA_VERSION }}
+
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v2
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Cache Gradle packages
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+
+    - name: Make gradlew executable
+      run: cd android && chmod +x ./gradlew
+
+    - name: Run Android unit tests
+      run: |
+        cd android
+        ./gradlew test
+
+    - name: Run Android lint
+      run: |
+        cd android
+        ./gradlew lint
+
+    - name: Upload lint reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: android-lint-reports
+        path: android/app/build/reports/lint-results*.html
+
+    - name: Build Android Debug APK
+      if: github.ref != 'refs/heads/main'
+      run: |
+        cd android
+        ./gradlew assembleDebug
+
+    - name: Build Android Release APK
+      if: github.ref == 'refs/heads/main'
+      env:
+        MYAPP_UPLOAD_STORE_FILE: ${{ secrets.ANDROID_KEYSTORE_FILE }}
+        MYAPP_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        MYAPP_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+        MYAPP_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      run: |
+        # Decode keystore
+        echo ${{ secrets.ANDROID_KEYSTORE_BASE64 }} | base64 -d > android/app/my-upload-key.keystore
+        
+        cd android
+        ./gradlew assembleRelease
+
+    - name: Upload Android artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: android-apks
+        path: |
+          android/app/build/outputs/apk/debug/*.apk
+          android/app/build/outputs/apk/release/*.apk
+
+  ios-build:
+    name: iOS Build and Test
+    runs-on: macos-latest
+    needs: test
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Setup Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ env.RUBY_VERSION }}
+        bundler-cache: true
+
+    - name: Setup Xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: latest-stable
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Install CocoaPods
+      run: |
+        cd ios
+        pod install --repo-update
+
+    - name: Cache CocoaPods
+      uses: actions/cache@v3
+      with:
+        path: ios/Pods
+        key: ${{ runner.os }}-pods-${{ hashFiles('**/Podfile.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-pods-
+
+    - name: Run iOS unit tests
+      run: |
+        cd ios
+        xcodebuild test \
+          -workspace DatingProfileOptimizer.xcworkspace \
+          -scheme DatingProfileOptimizer \
+          -destination 'platform=iOS Simulator,name=iPhone 14,OS=latest' \
+          -enableCodeCoverage YES \
+          -derivedDataPath build/
+
+    - name: Upload iOS test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: ios-test-results
+        path: ios/build/Logs/Test/
+
+    - name: Build iOS Debug
+      if: github.ref != 'refs/heads/main'
+      run: |
+        cd ios
+        xcodebuild archive \
+          -workspace DatingProfileOptimizer.xcworkspace \
+          -scheme DatingProfileOptimizer \
+          -configuration Debug \
+          -destination 'generic/platform=iOS Simulator' \
+          -archivePath build/DatingProfileOptimizer-Debug.xcarchive \
+          CODE_SIGN_IDENTITY="" \
+          CODE_SIGNING_REQUIRED=NO
+
+    - name: Build iOS Release
+      if: github.ref == 'refs/heads/main'
+      env:
+        MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+        FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: ${{ secrets.FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD }}
+        FASTLANE_SESSION: ${{ secrets.FASTLANE_SESSION }}
+      run: |
+        cd ios
+        # Install provisioning profiles and certificates
+        bundle exec fastlane match appstore --readonly
+        
+        # Build for release
+        xcodebuild archive \
+          -workspace DatingProfileOptimizer.xcworkspace \
+          -scheme DatingProfileOptimizer \
+          -configuration Release \
+          -destination 'generic/platform=iOS' \
+          -archivePath build/DatingProfileOptimizer-Release.xcarchive
+
+    - name: Export iOS IPA
+      if: github.ref == 'refs/heads/main'
+      run: |
+        cd ios
+        xcodebuild -exportArchive \
+          -archivePath build/DatingProfileOptimizer-Release.xcarchive \
+          -exportOptionsPlist ExportOptions.plist \
+          -exportPath build/
+
+    - name: Upload iOS artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: ios-builds
+        path: |
+          ios/build/*.ipa
+          ios/build/*.xcarchive
+
+  e2e-tests:
+    name: End-to-End Tests
+    runs-on: macos-latest
+    needs: [android-build, ios-build]
+    if: github.event_name == 'pull_request'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Install Detox CLI
+      run: npm install -g detox-cli
+
+    - name: Build Detox
+      run: detox build --configuration ios.sim.debug
+
+    - name: Run Detox tests
+      run: detox test --configuration ios.sim.debug --cleanup
+
+    - name: Upload Detox artifacts
+      uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: detox-artifacts
+        path: |
+          artifacts/
+          coverage/
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [android-build, ios-build]
+    if: github.ref == 'refs/heads/develop'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download Android artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: android-apks
+        path: ./artifacts/android
+
+    - name: Download iOS artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: ios-builds
+        path: ./artifacts/ios
+
+    - name: Upload to Firebase App Distribution
+      uses: wzieba/Firebase-Distribution-Github-Action@v1
+      with:
+        appId: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
+        token: ${{ secrets.FIREBASE_TOKEN }}
+        groups: testers, qa-team
+        file: ./artifacts/android/app-debug.apk
+        releaseNotes: |
+          🚀 New staging build from ${{ github.ref_name }}
+          
+          Commit: ${{ github.sha }}
+          Author: ${{ github.actor }}
+          
+          Changes in this build:
+          ${{ github.event.head_commit.message }}
+
+    - name: Upload iOS to TestFlight
+      uses: apple-actions/upload-testflight-build@v1
+      with:
+        app-path: './artifacts/ios/DatingProfileOptimizer.ipa'
+        issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+        api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
+        api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [android-build, ios-build]
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download Android artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: android-apks
+        path: ./artifacts/android
+
+    - name: Download iOS artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: ios-builds
+        path: ./artifacts/ios
+
+    - name: Upload to Google Play Console
+      uses: r0adkll/upload-google-play@v1
+      with:
+        serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        packageName: com.datingprofileoptimizer
+        releaseFiles: './artifacts/android/app-release.apk'
+        track: internal
+        status: draft
+        whatsNewDirectory: fastlane/metadata/android/
+
+    - name: Upload to App Store Connect
+      uses: apple-actions/upload-testflight-build@v1
+      with:
+        app-path: './artifacts/ios/DatingProfileOptimizer.ipa'
+        issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+        api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
+        api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+
+  notify:
+    name: Notify Teams
+    runs-on: ubuntu-latest
+    needs: [deploy-staging, deploy-production]
+    if: always()
+
+    steps:
+    - name: Notify Slack on Success
+      if: (needs.deploy-staging.result == 'success' && github.ref == 'refs/heads/develop') || (needs.deploy-production.result == 'success' && github.ref == 'refs/heads/main')
+      uses: 8398a7/action-slack@v3
+      with:
+        status: success
+        text: |
+          📱 Dating Profile Optimizer Mobile deployed successfully!
+          Environment: ${{ github.ref == 'refs/heads/main' && 'Production' || 'Staging' }}
+          Platform: iOS & Android
+          Branch: ${{ github.ref_name }}
+          Commit: ${{ github.sha }}
+          Author: ${{ github.actor }}
+        webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+    - name: Notify Slack on Failure
+      if: (needs.deploy-staging.result == 'failure' && github.ref == 'refs/heads/develop') || (needs.deploy-production.result == 'failure' && github.ref == 'refs/heads/main')
+      uses: 8398a7/action-slack@v3
+      with:
+        status: failure
+        text: |
+          💥 Dating Profile Optimizer Mobile deployment failed!
+          Environment: ${{ github.ref == 'refs/heads/main' && 'Production' || 'Staging' }}
+          Platform: iOS & Android
+          Branch: ${{ github.ref_name }}
+          Commit: ${{ github.sha }}
+          Author: ${{ github.actor }}
+        webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}

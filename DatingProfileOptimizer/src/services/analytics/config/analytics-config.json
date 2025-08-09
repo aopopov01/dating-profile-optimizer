@@ -1,0 +1,285 @@
+{
+  "analytics": {
+    "mixpanel": {
+      "token": "YOUR_MIXPANEL_TOKEN",
+      "trackAutomaticEvents": true
+    },
+    "amplitude": {
+      "apiKey": "YOUR_AMPLITUDE_API_KEY",
+      "trackingOptions": {
+        "deviceId": true,
+        "ipAddress": false,
+        "platform": true
+      }
+    },
+    "firebase": {
+      "enabled": true,
+      "automaticDataCollection": true
+    },
+    "segment": {
+      "writeKey": "YOUR_SEGMENT_WRITE_KEY",
+      "trackAppLifecycleEvents": true
+    },
+    "datadog": {
+      "clientToken": "YOUR_DATADOG_CLIENT_TOKEN",
+      "applicationId": "YOUR_DATADOG_APPLICATION_ID",
+      "environment": "production"
+    }
+  },
+  "reporting": {
+    "defaultSchedules": {
+      "executive": {
+        "frequency": "weekly",
+        "time": "09:00",
+        "dayOfWeek": 1,
+        "timezone": "UTC"
+      },
+      "product": {
+        "frequency": "daily",
+        "time": "08:00",
+        "timezone": "UTC"
+      },
+      "marketing": {
+        "frequency": "daily",
+        "time": "10:00",
+        "timezone": "UTC"
+      },
+      "operations": {
+        "frequency": "daily",
+        "time": "07:00",
+        "timezone": "UTC"
+      }
+    },
+    "emailSettings": {
+      "smtpHost": "smtp.gmail.com",
+      "smtpPort": 587,
+      "smtpUser": "analytics@company.com",
+      "smtpPassword": "YOUR_SMTP_PASSWORD",
+      "fromEmail": "analytics@company.com",
+      "fromName": "Dating Profile Analytics"
+    },
+    "slackSettings": {
+      "webhookUrl": "YOUR_SLACK_WEBHOOK_URL",
+      "defaultChannel": "#analytics",
+      "alertChannel": "#alerts"
+    }
+  },
+  "alerts": {
+    "defaultRules": [
+      {
+        "id": "revenue_drop_critical",
+        "name": "Critical Revenue Drop",
+        "metric": "daily_revenue",
+        "condition": "percent_change",
+        "threshold": -0.25,
+        "lookbackPeriod": "1d",
+        "severity": "critical",
+        "enabled": true,
+        "suppressionPeriod": 60,
+        "channels": [
+          {
+            "type": "email",
+            "configuration": {
+              "recipients": ["ceo@company.com", "cfo@company.com"]
+            },
+            "enabled": true
+          },
+          {
+            "type": "slack",
+            "configuration": {
+              "channel": "#critical-alerts"
+            },
+            "enabled": true
+          }
+        ]
+      },
+      {
+        "id": "crash_rate_high",
+        "name": "High Crash Rate",
+        "metric": "crash_rate",
+        "condition": "greater_than",
+        "threshold": 0.02,
+        "lookbackPeriod": "1h",
+        "severity": "critical",
+        "enabled": true,
+        "suppressionPeriod": 30,
+        "channels": [
+          {
+            "type": "email",
+            "configuration": {
+              "recipients": ["engineering@company.com"]
+            },
+            "enabled": true
+          }
+        ]
+      },
+      {
+        "id": "conversion_rate_low",
+        "name": "Low Conversion Rate",
+        "metric": "conversion_rate",
+        "condition": "less_than",
+        "threshold": 0.05,
+        "lookbackPeriod": "6h",
+        "severity": "warning",
+        "enabled": true,
+        "suppressionPeriod": 120,
+        "channels": [
+          {
+            "type": "slack",
+            "configuration": {
+              "channel": "#product-alerts"
+            },
+            "enabled": true
+          }
+        ]
+      },
+      {
+        "id": "ai_accuracy_drop",
+        "name": "AI Model Accuracy Drop",
+        "metric": "ai_model_accuracy",
+        "condition": "less_than",
+        "threshold": 0.85,
+        "lookbackPeriod": "30m",
+        "severity": "warning",
+        "enabled": true,
+        "suppressionPeriod": 60,
+        "channels": [
+          {
+            "type": "email",
+            "configuration": {
+              "recipients": ["ai-team@company.com"]
+            },
+            "enabled": true
+          }
+        ]
+      },
+      {
+        "id": "api_response_slow",
+        "name": "Slow API Response Time",
+        "metric": "api_response_time",
+        "condition": "greater_than",
+        "threshold": 3000,
+        "lookbackPeriod": "15m",
+        "severity": "warning",
+        "enabled": true,
+        "suppressionPeriod": 30,
+        "channels": [
+          {
+            "type": "slack",
+            "configuration": {
+              "channel": "#engineering"
+            },
+            "enabled": true
+          }
+        ]
+      }
+    ]
+  },
+  "aiModels": {
+    "photoAnalysis": {
+      "modelId": "photo_analyzer_v2",
+      "modelType": "photo_analysis",
+      "version": "2.1.0",
+      "provider": "openai",
+      "endpoint": "https://api.openai.com/v1/chat/completions",
+      "costPerRequest": 0.002,
+      "expectedResponseTime": 5000,
+      "qualityThresholds": {
+        "accuracy": 0.90,
+        "userSatisfaction": 0.80,
+        "successRate": 0.95
+      }
+    },
+    "bioGeneration": {
+      "modelId": "bio_generator_v1",
+      "modelType": "bio_generation",
+      "version": "1.3.0",
+      "provider": "openai",
+      "endpoint": "https://api.openai.com/v1/chat/completions",
+      "costPerRequest": 0.001,
+      "expectedResponseTime": 3000,
+      "qualityThresholds": {
+        "accuracy": 0.85,
+        "userSatisfaction": 0.85,
+        "successRate": 0.98
+      }
+    },
+    "headshotGeneration": {
+      "modelId": "headshot_generator_v1",
+      "modelType": "headshot_generation",
+      "version": "1.0.0",
+      "provider": "custom",
+      "endpoint": "https://api.company.com/v1/headshots",
+      "costPerRequest": 0.05,
+      "expectedResponseTime": 15000,
+      "qualityThresholds": {
+        "accuracy": 0.92,
+        "userSatisfaction": 0.88,
+        "successRate": 0.96
+      }
+    },
+    "optimization": {
+      "modelId": "profile_optimizer_v1",
+      "modelType": "optimization",
+      "version": "1.2.0",
+      "provider": "openai",
+      "endpoint": "https://api.openai.com/v1/chat/completions",
+      "costPerRequest": 0.003,
+      "expectedResponseTime": 7000,
+      "qualityThresholds": {
+        "accuracy": 0.88,
+        "userSatisfaction": 0.82,
+        "successRate": 0.94
+      }
+    }
+  },
+  "performanceThresholds": {
+    "appLaunchTime": 3000,
+    "screenLoadTime": 1000,
+    "apiResponseTime": 2000,
+    "crashRate": 0.01,
+    "anrRate": 0.005,
+    "memoryUsageLimit": 512,
+    "cpuUsageLimit": 80,
+    "networkLatency": 1000
+  },
+  "dataRetention": {
+    "rawEvents": "90d",
+    "aggregatedMetrics": "2y",
+    "reports": "1y",
+    "alerts": "6m",
+    "crashes": "1y",
+    "aiMetrics": "1y"
+  },
+  "sampling": {
+    "events": {
+      "production": 1.0,
+      "staging": 1.0,
+      "development": 0.1
+    },
+    "performance": {
+      "production": 0.1,
+      "staging": 1.0,
+      "development": 1.0
+    }
+  },
+  "privacy": {
+    "enableDataCollection": true,
+    "respectDoNotTrack": true,
+    "anonymizeIpAddresses": true,
+    "gdprCompliant": true,
+    "ccpaCompliant": true,
+    "dataProcessingConsent": "required",
+    "retentionPeriod": "2y"
+  },
+  "features": {
+    "realTimeAlerts": true,
+    "automaticReporting": true,
+    "aiModelMonitoring": true,
+    "crossPlatformTracking": true,
+    "offlineEventQueue": true,
+    "dataExport": true,
+    "customDashboards": true,
+    "abTesting": true
+  }
+}

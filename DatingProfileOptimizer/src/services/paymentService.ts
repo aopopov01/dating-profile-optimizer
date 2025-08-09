@@ -1,0 +1,435 @@
+import { initStripe, useStripe, useConfirmPayment } from '@stripe/stripe-react-native';
+
+/**
+ * Payment Service for Dating Profile Optimizer
+ * Handles Stripe integration for one-time purchases and subscriptions
+ */
+
+export interface PricingTier {
+  id: string;
+  name: string;
+  price: number;
+  currency: string;
+  features: string[];
+  popular?: boolean;
+  stripePriceId?: string;
+}
+
+export interface PaymentResult {
+  success: boolean;
+  paymentIntent?: string;
+  error?: string;
+  receipt?: string;
+}
+
+export interface PurchaseData {
+  userId: string;
+  email: string;
+  tier: PricingTier;
+  platform?: string;
+  photos?: number;
+}
+
+class PaymentService {
+  private isInitialized: boolean = false;
+  private publishableKey: string;
+
+  constructor(publishableKey: string) {
+    this.publishableKey = publishableKey;
+  }
+
+  /**
+   * Initialize Stripe SDK
+   */
+  async initialize(): Promise<void> {
+    if (this.isInitialized) return;
+
+    try {
+      await initStripe({
+        publishableKey: this.publishableKey,
+        merchantDisplayName: 'Dating Profile Optimizer',
+        applePay: {
+          merchantId: 'merchant.com.datingprofileoptimizer',
+        },
+        googlePay: {
+          merchantId: 'dating-profile-optimizer',
+          testEnv: __DEV__, // Use test environment in development
+        },
+      });
+      
+      this.isInitialized = true;
+      console.log('Stripe initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize Stripe:', error);
+      throw new Error('Payment system initialization failed');
+    }
+  }
+
+  /**
+   * Get available pricing tiers
+   */
+  getPricingTiers(): PricingTier[] {
+    return [
+      {
+        id: 'basic',
+        name: 'Basic Optimization',
+        price: 9.99,
+        currency: 'USD',
+        stripePriceId: 'price_basic_optimization',
+        features: [
+          'AI photo analysis',
+          'Photo scoring & ranking',
+          '1 personalized bio',
+          'Basic recommendations',
+          'Photo optimization tips',
+        ],
+      },
+      {
+        id: 'premium',
+        name: 'Premium Package',
+        price: 19.99,
+        currency: 'USD',
+        stripePriceId: 'price_premium_package',
+        popular: true,
+        features: [
+          'Everything in Basic',
+          '3 bio variations',
+          'Platform-specific optimization',
+          'Advanced photo analysis',
+          'Messaging tips',
+          'Success tracking (30 days)',
+        ],
+      },
+      {
+        id: 'complete',
+        name: 'Complete Makeover',
+        price: 39.99,
+        currency: 'USD',
+        stripePriceId: 'price_complete_makeover',
+        features: [
+          'Everything in Premium',
+          'Unlimited bio regeneration',
+          'Professional photo editing',
+          'Personal dating coach session',
+          'Success guarantee',
+          '90-day support',
+        ],
+      },
+      {
+        id: 'monthly',
+        name: 'Monthly Coaching',
+        price: 14.99,
+        currency: 'USD',
+        stripePriceId: 'price_monthly_coaching',
+        features: [
+          'Monthly profile updates',
+          'New photo analysis',
+          'Fresh bio generation',
+          'Performance tracking',
+          'Ongoing optimization',
+          'Priority support',
+        ],
+      },
+    ];
+  }
+
+  /**
+   * Create payment intent for one-time purchase
+   */
+  async createPaymentIntent(purchaseData: PurchaseData): Promise<{
+    clientSecret: string;
+    amount: number;
+  }> {
+    try {
+      // In production, this would call your backend API
+      const response = await this.mockCreatePaymentIntent(purchaseData);
+      return response;
+    } catch (error) {
+      console.error('Failed to create payment intent:', error);
+      throw new Error('Failed to initialize payment');
+    }
+  }
+
+  /**
+   * Process payment with Stripe
+   */
+  async processPayment(
+    clientSecret: string,
+    paymentMethodData: any,
+    purchaseData: PurchaseData
+  ): Promise<PaymentResult> {
+    try {
+      if (!this.isInitialized) {
+        await this.initialize();
+      }
+
+      // Mock payment processing - in production use actual Stripe hooks
+      const result = await this.mockProcessPayment(clientSecret, paymentMethodData);
+      
+      if (result.success) {
+        // Track successful purchase
+        await this.trackPurchase(purchaseData, result.paymentIntent!);
+        
+        // Send confirmation email (in production)
+        await this.sendPurchaseConfirmation(purchaseData, result);
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Payment processing failed:', error);
+      return {
+        success: false,
+        error: 'Payment failed. Please try again.',
+      };
+    }
+  }
+
+  /**
+   * Handle subscription setup for monthly coaching
+   */
+  async setupSubscription(
+    customerId: string,
+    priceId: string,
+    paymentMethodId: string
+  ): Promise<{
+    subscriptionId: string;
+    status: string;
+    clientSecret?: string;
+  }> {
+    try {
+      // Mock subscription setup - in production call backend API
+      return await this.mockSetupSubscription(customerId, priceId, paymentMethodId);
+    } catch (error) {
+      console.error('Subscription setup failed:', error);
+      throw new Error('Failed to set up subscription');
+    }
+  }
+
+  /**
+   * Cancel subscription
+   */
+  async cancelSubscription(subscriptionId: string): Promise<boolean> {
+    try {
+      // Mock cancellation - in production call backend API
+      await this.mockCancelSubscription(subscriptionId);
+      return true;
+    } catch (error) {
+      console.error('Subscription cancellation failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get purchase history for user
+   */
+  async getPurchaseHistory(userId: string): Promise<{
+    purchases: Array<{
+      id: string;
+      date: string;
+      amount: number;
+      tier: string;
+      status: string;
+    }>;
+    subscriptions: Array<{
+      id: string;
+      status: string;
+      currentPeriodEnd: string;
+      tier: string;
+    }>;
+  }> {
+    try {
+      // Mock purchase history - in production call backend API
+      return await this.mockGetPurchaseHistory(userId);
+    } catch (error) {
+      console.error('Failed to fetch purchase history:', error);
+      throw new Error('Could not retrieve purchase history');
+    }
+  }
+
+  /**
+   * Validate purchase and unlock features
+   */
+  async validatePurchase(
+    paymentIntentId: string,
+    userId: string
+  ): Promise<{
+    valid: boolean;
+    tier: PricingTier;
+    features: string[];
+    expiresAt?: string;
+  }> {
+    try {
+      // Mock validation - in production verify with backend
+      return await this.mockValidatePurchase(paymentIntentId, userId);
+    } catch (error) {
+      console.error('Purchase validation failed:', error);
+      return {
+        valid: false,
+        tier: this.getPricingTiers()[0],
+        features: [],
+      };
+    }
+  }
+
+  /**
+   * Handle refund request
+   */
+  async requestRefund(
+    paymentIntentId: string,
+    reason: string,
+    userId: string
+  ): Promise<{
+    success: boolean;
+    refundId?: string;
+    message: string;
+  }> {
+    try {
+      // Mock refund - in production process through Stripe and backend
+      return await this.mockRequestRefund(paymentIntentId, reason, userId);
+    } catch (error) {
+      console.error('Refund request failed:', error);
+      return {
+        success: false,
+        message: 'Refund request could not be processed',
+      };
+    }
+  }
+
+  // Private mock methods - replace with actual API calls in production
+
+  private async mockCreatePaymentIntent(purchaseData: PurchaseData): Promise<{
+    clientSecret: string;
+    amount: number;
+  }> {
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    const amount = Math.round(purchaseData.tier.price * 100); // Convert to cents
+    
+    return {
+      clientSecret: `pi_mock_${Date.now()}_secret_mock`,
+      amount,
+    };
+  }
+
+  private async mockProcessPayment(
+    clientSecret: string,
+    paymentMethodData: any
+  ): Promise<PaymentResult> {
+    // Simulate processing delay
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Mock success (90% success rate for demo)
+    const success = Math.random() > 0.1;
+    
+    if (success) {
+      return {
+        success: true,
+        paymentIntent: `pi_${Date.now()}`,
+        receipt: `rec_${Date.now()}`,
+      };
+    } else {
+      return {
+        success: false,
+        error: 'Your card was declined. Please try a different payment method.',
+      };
+    }
+  }
+
+  private async mockSetupSubscription(
+    customerId: string,
+    priceId: string,
+    paymentMethodId: string
+  ): Promise<{
+    subscriptionId: string;
+    status: string;
+    clientSecret?: string;
+  }> {
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    return {
+      subscriptionId: `sub_${Date.now()}`,
+      status: 'active',
+      clientSecret: `seti_mock_${Date.now()}_secret_mock`,
+    };
+  }
+
+  private async mockCancelSubscription(subscriptionId: string): Promise<void> {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Mock cancellation success
+  }
+
+  private async mockGetPurchaseHistory(userId: string): Promise<any> {
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    return {
+      purchases: [
+        {
+          id: 'pi_1234567890',
+          date: '2024-08-01',
+          amount: 19.99,
+          tier: 'Premium Package',
+          status: 'succeeded',
+        },
+      ],
+      subscriptions: [],
+    };
+  }
+
+  private async mockValidatePurchase(
+    paymentIntentId: string,
+    userId: string
+  ): Promise<any> {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    const tiers = this.getPricingTiers();
+    const tier = tiers[1]; // Premium package
+    
+    return {
+      valid: true,
+      tier,
+      features: tier.features,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
+    };
+  }
+
+  private async mockRequestRefund(
+    paymentIntentId: string,
+    reason: string,
+    userId: string
+  ): Promise<any> {
+    await new Promise(resolve => setTimeout(resolve, 1200));
+    
+    return {
+      success: true,
+      refundId: `re_${Date.now()}`,
+      message: 'Refund will be processed within 3-5 business days',
+    };
+  }
+
+  private async trackPurchase(purchaseData: PurchaseData, paymentIntentId: string): Promise<void> {
+    // Track purchase analytics
+    console.log('Purchase tracked:', {
+      userId: purchaseData.userId,
+      tier: purchaseData.tier.name,
+      amount: purchaseData.tier.price,
+      paymentIntentId,
+    });
+  }
+
+  private async sendPurchaseConfirmation(
+    purchaseData: PurchaseData,
+    result: PaymentResult
+  ): Promise<void> {
+    // Send confirmation email
+    console.log('Confirmation email sent to:', purchaseData.email);
+  }
+}
+
+// Export singleton instance with mock publishable key
+export const paymentService = new PaymentService(
+  __DEV__ ? 'pk_test_mock_key' : 'pk_live_your_actual_key'
+);
+
+// Export class for custom configurations
+export { PaymentService };

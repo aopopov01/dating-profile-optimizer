@@ -41,48 +41,138 @@ A mobile app that uses AI to analyze dating profile photos, select the best imag
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js 18+
-- React Native CLI
-- Docker and Docker Compose
-- Android/iOS development environment
 
-### Local Development
+#### System Requirements
+- Node.js 18+ (LTS recommended)
+- npm 8+ or Yarn 1.22+
+- Git 2.25+
+- Docker 20.10+ and Docker Compose 2.0+
+
+#### Mobile Development Environment
+- **React Native CLI**: `npm install -g @react-native-community/cli`
+- **Android Development**:
+  - Android Studio with Android SDK 31+
+  - Android NDK (latest)
+  - Java Development Kit (JDK) 11
+  - Android device or emulator with API level 31+
+- **iOS Development** (macOS only):
+  - Xcode 13+ with iOS SDK 15+
+  - CocoaPods: `sudo gem install cocoapods`
+  - iOS Simulator or physical device with iOS 15+
+
+#### Development Tools
+- **Database**: PostgreSQL 13+ (or use Docker)
+- **Cache**: Redis 6+ (or use Docker)
+- **Text Editor**: VS Code with React Native Tools extension recommended
+
+### Quick Start
+
 ```bash
-# Clone the repository
+# 1. Clone the repository
 git clone https://github.com/yourusername/dating-profile-optimizer.git
 cd dating-profile-optimizer
 
-# Install dependencies
+# 2. Install root dependencies
 npm install
 
-# Start the backend services
+# 3. Set up environment variables (see Environment Setup section below)
+cp .env.example .env
+# Edit .env with your configuration
+
+# 4. Start backend services with Docker
 cd backend
 docker-compose up -d
+
+# 5. Run database migrations
+npm run migrate
+
+# 6. Start the backend in development mode
 npm run dev
 
-# Start the mobile app (in a new terminal)
-cd DatingProfileOptimizer
+# 7. In a new terminal, install mobile app dependencies
+cd ../DatingProfileOptimizer
 npm install
-npx react-native run-android  # or run-ios
+
+# 8. For iOS only (macOS users)
+cd ios && pod install && cd ..
+
+# 9. Start the React Native app
+# For Android:
+npx react-native run-android
+
+# For iOS (macOS only):
+npx react-native run-ios
 ```
 
-### Environment Setup
-Copy `.env.example` to `.env` and configure:
+### Environment Configuration
+
+#### Backend Environment Variables
+Create `/backend/.env` with the following configuration:
+
 ```env
-# AI Services
-OPENAI_API_KEY=your_openai_key
-COMPUTER_VISION_API_KEY=your_cv_key
+# Server Configuration
+NODE_ENV=development
+PORT=3002
+API_BASE_URL=http://localhost:3002
 
-# Payment Processing
-STRIPE_PUBLISHABLE_KEY=your_stripe_key
-STRIPE_SECRET_KEY=your_stripe_secret
-
-# Database
-DATABASE_URL=postgresql://user:password@localhost:5432/dating_optimizer
+# Database Configuration
+DATABASE_URL=postgresql://dating_user:dating_password@localhost:5432/dating_optimizer_dev
 REDIS_URL=redis://localhost:6379
 
+# AI Services
+OPENAI_API_KEY=sk-proj-your_openai_api_key_here
+OPENAI_ORG_ID=org-your_openai_org_id_here
+COMPUTER_VISION_API_KEY=your_azure_computer_vision_key
+COMPUTER_VISION_ENDPOINT=https://your-region.cognitiveservices.azure.com/
+
+# Payment Processing
+STRIPE_PUBLISHABLE_KEY=pk_test_your_stripe_publishable_key
+STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key
+STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
+
+# Cloud Storage
+CLOUDINARY_CLOUD_NAME=your_cloudinary_name
+CLOUDINARY_API_KEY=your_cloudinary_key
+CLOUDINARY_API_SECRET=your_cloudinary_secret
+
+# Analytics & Monitoring
+MIXPANEL_TOKEN=your_mixpanel_project_token
+
+# Security
+JWT_SECRET=your_super_secure_jwt_secret_key_here
+ENCRYPTION_KEY=your_32_character_encryption_key_here
+
+# Rate Limiting
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX_REQUESTS=100
+
+# File Upload
+MAX_FILE_SIZE_MB=10
+```
+
+#### Mobile App Environment Variables
+Create `/DatingProfileOptimizer/.env` with:
+
+```env
+# API Configuration
+API_BASE_URL=http://localhost:3002
+API_TIMEOUT_MS=30000
+
+# Stripe Configuration (use same keys as backend)
+STRIPE_PUBLISHABLE_KEY=pk_test_your_stripe_publishable_key
+
 # Analytics
-MIXPANEL_TOKEN=your_mixpanel_token
+MIXPANEL_TOKEN=your_mixpanel_project_token
+AMPLITUDE_API_KEY=your_amplitude_api_key
+
+# Feature Flags
+ENABLE_BIOMETRIC_AUTH=true
+ENABLE_ANALYTICS=true
+ENABLE_CRASH_REPORTING=true
+
+# Development
+DEBUG_MODE=true
+LOG_LEVEL=debug
 ```
 
 ## 📊 Project Structure
@@ -106,18 +196,46 @@ dating-profile-optimizer/
 ```
 
 ## 🧪 Testing
+
+### Running Tests
+
 ```bash
-# Run comprehensive test suite
-npm test
+# Run all tests with coverage
+npm run test:all
 
-# Run with coverage (87.3% achieved)
+# Run specific test suites
+npm run test              # Unit tests
+npm run test:integration  # Integration tests
+npm run test:security     # Security tests
+npm run test:performance  # Performance tests
+npm run test:e2e         # End-to-end tests
+
+# Watch mode for development
+npm run test:watch
+
+# Generate coverage report (target: 87%+)
 npm run test:coverage
+```
 
-# Run AI performance tests
-npm run test:ai
+### Test Categories
 
-# Run dating psychology validation
-npm run test:psychology
+- **Unit Tests**: Component and service testing
+- **Integration Tests**: API endpoints and database operations
+- **Security Tests**: Authentication, authorization, and data protection
+- **Performance Tests**: Load testing and optimization validation
+- **E2E Tests**: Complete user flows using Detox framework
+
+### Quality Assurance
+
+```bash
+# Pre-commit quality checks
+npm run quality:check
+
+# Security audit
+npm run audit:security
+
+# Dependency vulnerability check
+npm run audit:dependencies
 ```
 
 ## 📈 Marketing Strategy
@@ -151,11 +269,276 @@ npm run test:psychology
 - **Offline Capability**: Cache results for offline viewing
 - **Battery Efficiency**: Optimized for mobile performance
 
+## 🚀 Deployment
+
+### Docker Deployment
+
+#### Development Environment
+```bash
+# Start all services
+docker-compose -f docker-compose.dev.yml up -d
+
+# View logs
+docker-compose logs -f backend
+```
+
+#### Production Environment
+```bash
+# Build and start production containers
+docker-compose -f docker-compose.yml up -d
+
+# Scale backend service
+docker-compose up -d --scale backend=3
+```
+
+### Kubernetes Deployment
+
+#### Prerequisites
+- Kubernetes cluster (1.21+)
+- kubectl configured
+- Helm 3.x (optional)
+
+#### Deploy to Kubernetes
+```bash
+# Create namespace
+kubectl apply -f k8s/namespace.yaml
+
+# Deploy backend services
+kubectl apply -f k8s/backend/
+
+# Check deployment status
+kubectl get pods -n dating-optimizer
+
+# View service endpoints
+kubectl get services -n dating-optimizer
+```
+
+#### Environment Configuration
+```bash
+# Create production secrets
+kubectl create secret generic backend-secrets \
+  --from-literal=openai-api-key=your_key \
+  --from-literal=stripe-secret-key=your_key \
+  --from-literal=jwt-secret=your_secret \
+  -n dating-optimizer
+```
+
+### Mobile App Deployment
+
+#### Android Production Build
+```bash
+# Generate signed APK
+cd DatingProfileOptimizer/android
+./gradlew assembleRelease
+
+# Generate AAB for Play Store
+./gradlew bundleRelease
+
+# APK location: app/build/outputs/apk/release/app-release.apk
+# AAB location: app/build/outputs/bundle/release/app-release.aab
+```
+
+#### iOS Production Build
+```bash
+# Archive for App Store (macOS only)
+cd DatingProfileOptimizer/ios
+xcodebuild -workspace DatingProfileOptimizer.xcworkspace \
+           -scheme DatingProfileOptimizer \
+           -configuration Release \
+           -archivePath build/DatingProfileOptimizer.xcarchive \
+           archive
+```
+
+### Environment-Specific Configuration
+
+#### Staging Environment
+```env
+NODE_ENV=staging
+API_BASE_URL=https://staging-api.datingoptimizer.com
+ENABLE_DEBUG_LOGS=true
+```
+
+#### Production Environment
+```env
+NODE_ENV=production
+API_BASE_URL=https://api.datingoptimizer.com
+ENABLE_DEBUG_LOGS=false
+RATE_LIMIT_MAX_REQUESTS=1000
+```
+
+## 🔧 Troubleshooting
+
+### Common Development Issues
+
+#### Backend Issues
+
+**Database Connection Failed**
+```bash
+# Check PostgreSQL status
+docker-compose ps postgres
+
+# Reset database
+docker-compose down -v
+docker-compose up -d postgres
+npm run migrate
+```
+
+**Redis Connection Failed**
+```bash
+# Check Redis status
+docker-compose logs redis
+
+# Restart Redis
+docker-compose restart redis
+```
+
+**OpenAI API Errors**
+```bash
+# Verify API key
+curl -H "Authorization: Bearer $OPENAI_API_KEY" \
+     https://api.openai.com/v1/models
+
+# Check rate limits
+# Rate limit: 60 requests/minute for free tier
+# Upgrade to paid plan for higher limits
+```
+
+#### Mobile App Issues
+
+**Metro Bundler Issues**
+```bash
+# Clear Metro cache
+npx react-native start --reset-cache
+
+# Clear all caches
+cd DatingProfileOptimizer
+rm -rf node_modules
+npm install
+cd ios && pod install && cd ..
+```
+
+**Android Build Failures**
+```bash
+# Clean Android build
+cd android
+./gradlew clean
+cd ..
+
+# Clear React Native cache
+rm -rf node_modules
+npm install
+
+# Reset Android project
+npx react-native run-android --reset-cache
+```
+
+**iOS Build Failures (macOS)**
+```bash
+# Clean iOS build
+cd ios
+rm -rf build Pods Podfile.lock
+pod install
+cd ..
+
+# Clear derived data
+rm -rf ~/Library/Developer/Xcode/DerivedData
+```
+
+### Performance Issues
+
+**Slow Image Processing**
+```bash
+# Check server resources
+docker stats
+
+# Scale backend services
+docker-compose up -d --scale backend=2
+
+# Monitor AI service response times
+curl -w "@curl-format.txt" -o /dev/null -s http://localhost:3002/api/health
+```
+
+**Memory Issues**
+```bash
+# Check memory usage
+docker stats --no-stream
+
+# Increase container memory limits in docker-compose.yml:
+services:
+  backend:
+    mem_limit: 2g
+    memswap_limit: 2g
+```
+
+### Security Issues
+
+**JWT Token Problems**
+```bash
+# Verify JWT secret is set
+echo $JWT_SECRET
+
+# Check token expiration
+node -e "console.log(require('jsonwebtoken').decode('YOUR_TOKEN'))"
+```
+
+**SSL/TLS Certificate Issues**
+```bash
+# Check certificate validity
+openssl s_client -connect api.datingoptimizer.com:443 -servername api.datingoptimizer.com
+
+# Renew Let's Encrypt certificates
+certbot renew --dry-run
+```
+
+### Monitoring and Logs
+
+**Check Application Logs**
+```bash
+# Backend logs
+docker-compose logs -f backend
+
+# Database logs
+docker-compose logs -f postgres
+
+# Redis logs
+docker-compose logs -f redis
+
+# Kubernetes logs
+kubectl logs -f deployment/backend -n dating-optimizer
+```
+
+**Performance Monitoring**
+```bash
+# Check API response times
+curl -w "%{time_total}\\n" -o /dev/null -s http://localhost:3002/api/health
+
+# Monitor database performance
+docker exec -it dating-postgres psql -U dating_user -d dating_optimizer_dev -c "SELECT * FROM pg_stat_activity;"
+```
+
 ## 📄 Documentation
-- **API Documentation**: Available at `/docs` endpoint
-- **Design System**: Complete Material Design 3 specifications
-- **Marketing Materials**: Comprehensive ASO and launch strategy
+
+### API Documentation
+- **Swagger UI**: Available at `/docs` endpoint when server is running
+- **OpenAPI Spec**: Generated from JSDoc comments
+- **Postman Collection**: Available in `/docs/postman/` directory
+
+### Architecture Documentation
+- **System Design**: Complete architecture diagrams in `/docs/architecture/`
+- **Database Schema**: Entity relationship diagrams and migration files
+- **Security Framework**: Comprehensive security implementation guide
+- **Component Guide**: UI/UX component library documentation
+
+### Development Guides
+- **Setup Guide**: Detailed environment configuration
+- **Contributing Guidelines**: Code standards and pull request process
+- **Testing Guide**: Comprehensive testing strategies and best practices
+- **Deployment Guide**: Production deployment procedures
+
+### Business Documentation
+- **Marketing Strategy**: Complete ASO and launch strategy
 - **Psychology Research**: Dating success principles and algorithms
+- **Analytics Framework**: User behavior tracking and business intelligence
 
 ## 🤝 Contributing
 1. Fork the repository

@@ -1,16 +1,84 @@
+# Dependencies
 node_modules/
-*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Environment variables
 .env
-.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+logs
+*.log
+
+# Build outputs
 build/
 dist/
 coverage/
-*.tgz
-*.tar.gz
-.nyc_output
+
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-DatingProfileOptimizer/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# React Native
+.expo/
+.expo-shared/
+*.hprof
+
+# Android
+*.apk
+*.aab
+android/app/build/
+android/app/release/
+android/build/
+android/local.properties
+android/keystores/
+android/.gradle/
+
+# iOS
+ios/build/
+ios/Pods/
+ios/*.xcworkspace
+ios/*.xcuserdata
+ios/DerivedData/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+
+# Docker
+.dockerignore
+
+# Backend specific
+backend/uploads/
+backend/temp/
+backend/logs/
+
+# Temporary files
+tmp/
+temp/
+*.tgz
+*.tar.gz
+.nyc_output
