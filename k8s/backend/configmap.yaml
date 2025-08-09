@@ -1,0 +1,101 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dating-optimizer-backend-config
+  namespace: ${NAMESPACE:-dating-optimizer-production}
+  labels:
+    app: dating-optimizer-backend
+    component: backend
+    environment: ${ENVIRONMENT:-production}
+data:
+  # Application Configuration
+  NODE_ENV: "production"
+  PORT: "3000"
+  METRICS_PORT: "9090"
+  API_VERSION: "v1"
+  LOG_LEVEL: "info"
+  
+  # Security Configuration
+  CORS_ORIGIN: "${CORS_ORIGIN:-https://dating-optimizer.com,https://app.dating-optimizer.com}"
+  CORS_METHODS: "GET,POST,PUT,DELETE,PATCH,OPTIONS"
+  CORS_CREDENTIALS: "true"
+  HELMET_ENABLED: "true"
+  TRUST_PROXY: "true"
+  
+  # Rate Limiting
+  RATE_LIMIT_WINDOW_MS: "900000"  # 15 minutes
+  RATE_LIMIT_MAX_REQUESTS: "1000"
+  RATE_LIMIT_SKIP_SUCCESS: "true"
+  UPLOAD_RATE_LIMIT_MAX: "10"     # 10 uploads per window
+  
+  # File Upload Configuration
+  UPLOAD_MAX_SIZE: "10485760"     # 10MB
+  UPLOAD_MAX_FILES: "10"
+  UPLOAD_ALLOWED_TYPES: "image/jpeg,image/png,image/webp,image/heic"
+  UPLOAD_DESTINATION: "/app/uploads"
+  UPLOAD_TEMP_DIR: "/app/temp"
+  
+  # Cache Configuration
+  CACHE_TTL: "3600"               # 1 hour
+  CACHE_MAX_SIZE: "1000"
+  CACHE_CHECK_PERIOD: "600"       # 10 minutes
+  
+  # Session Configuration
+  SESSION_TIMEOUT: "86400"        # 24 hours
+  SESSION_SECURE: "true"
+  SESSION_HTTP_ONLY: "true"
+  SESSION_SAME_SITE: "strict"
+  
+  # AI Processing Configuration
+  AI_PROCESSING_TIMEOUT: "300"    # 5 minutes
+  AI_RETRY_ATTEMPTS: "3"
+  AI_RETRY_DELAY: "1000"          # 1 second
+  OPENAI_MODEL: "gpt-4-vision-preview"
+  OPENAI_MAX_TOKENS: "4096"
+  OPENAI_TEMPERATURE: "0.7"
+  
+  # Image Processing Configuration
+  IMAGE_PROCESSING_TIMEOUT: "120" # 2 minutes
+  IMAGE_QUALITY: "85"
+  IMAGE_MAX_WIDTH: "2048"
+  IMAGE_MAX_HEIGHT: "2048"
+  THUMBNAIL_WIDTH: "300"
+  THUMBNAIL_HEIGHT: "300"
+  
+  # Database Configuration
+  DB_POOL_MIN: "2"
+  DB_POOL_MAX: "10"
+  DB_IDLE_TIMEOUT: "30000"        # 30 seconds
+  DB_CONNECTION_TIMEOUT: "60000"   # 60 seconds
+  DB_STATEMENT_TIMEOUT: "30000"   # 30 seconds
+  
+  # Monitoring and Health Checks
+  HEALTH_CHECK_INTERVAL: "30"
+  HEALTH_CHECK_TIMEOUT: "10"
+  PROMETHEUS_METRICS_ENABLED: "true"
+  SENTRY_ENABLED: "${SENTRY_ENABLED:-true}"
+  SENTRY_SAMPLE_RATE: "0.1"
+  
+  # Feature Flags
+  FEATURE_A_B_TESTING: "true"
+  FEATURE_ANALYTICS: "true"
+  FEATURE_RECOMMENDATIONS: "true"
+  FEATURE_PREMIUM_FEATURES: "true"
+  
+  # Analytics Configuration
+  ANALYTICS_BATCH_SIZE: "100"
+  ANALYTICS_FLUSH_INTERVAL: "30000" # 30 seconds
+  ANALYTICS_ENABLED: "true"
+  
+  # Payment Configuration
+  STRIPE_WEBHOOK_ENDPOINT_SECRET: "whsec_..."  # Set in secrets
+  PAYMENT_SUCCESS_URL: "${FRONTEND_URL}/payment/success"
+  PAYMENT_CANCEL_URL: "${FRONTEND_URL}/payment/cancel"
+  
+  # External Services
+  CLOUDINARY_FOLDER: "dating-profile-optimizer"
+  CLOUDINARY_TRANSFORMATION: "c_fill,w_1024,h_1024,q_auto:good,f_auto"
+  
+  # Timezone and Locale
+  TZ: "UTC"
+  LOCALE: "en-US"

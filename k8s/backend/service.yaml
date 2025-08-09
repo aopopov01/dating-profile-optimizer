@@ -1,0 +1,90 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: dating-optimizer-backend-service
+  namespace: ${NAMESPACE:-dating-optimizer-production}
+  labels:
+    app: dating-optimizer-backend
+    component: backend
+    environment: ${ENVIRONMENT:-production}
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: http
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: /api/v1/health
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-interval: "30"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-timeout: "10"
+    service.beta.kubernetes.io/aws-load-balancer-healthy-threshold: "2"
+    service.beta.kubernetes.io/aws-load-balancer-unhealthy-threshold: "3"
+    service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout: "60"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "3000"
+    prometheus.io/path: "/api/v1/metrics"
+spec:
+  type: LoadBalancer
+  selector:
+    app: dating-optimizer-backend
+    component: backend
+  ports:
+  - name: http
+    port: 80
+    targetPort: 3000
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+  externalTrafficPolicy: Local
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dating-optimizer-backend-headless
+  namespace: ${NAMESPACE:-dating-optimizer-production}
+  labels:
+    app: dating-optimizer-backend
+    component: backend
+    service-type: headless
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app: dating-optimizer-backend
+    component: backend
+  ports:
+  - name: http
+    port: 3000
+    targetPort: 3000
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dating-optimizer-backend-internal
+  namespace: ${NAMESPACE:-dating-optimizer-production}
+  labels:
+    app: dating-optimizer-backend
+    component: backend
+    service-type: internal
+spec:
+  type: ClusterIP
+  selector:
+    app: dating-optimizer-backend
+    component: backend
+  ports:
+  - name: http
+    port: 80
+    targetPort: 3000
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP

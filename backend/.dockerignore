@@ -1,0 +1,116 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime logs
+logs/
+*.log
+lerna-debug.log*
+
+# Environment files (security critical)
+.env*
+!.env.example
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Icon?
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+*.sublime-project
+
+# Testing and coverage
+coverage/
+.nyc_output/
+test-results/
+junit.xml
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Docker
+Dockerfile*
+.dockerignore
+docker-compose*.yml
+.docker/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+azure-pipelines.yml
+Jenkinsfile
+
+# Documentation
+README.md
+CHANGELOG.md
+docs/
+*.md
+
+# Temporary files and directories
+*.tmp
+*.temp
+temp/
+tmp/
+.temp/
+.tmp/
+
+# Development uploads (production uses external storage)
+uploads/
+public/uploads/
+static/uploads/
+
+# Database files
+*.sqlite
+*.sqlite3
+*.db
+
+# Build artifacts
+build/
+dist/
+out/
+
+# Package manager files
+package-lock.json
+yarn.lock
+.pnp.*
+.yarn/
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+
+# Terraform
+*.tfstate
+*.tfstate.backup
+.terraform/
+
+# Kubernetes
+k8s/
+
+# Monitoring and profiling
+.profiling/
+heap-*.json

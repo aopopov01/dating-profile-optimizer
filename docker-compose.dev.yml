@@ -1,0 +1,139 @@
+# Development override for Dating Profile Optimizer
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: builder
+    environment:
+      - NODE_ENV=development
+      - DEBUG=app:*
+      - ENABLE_DEBUG_LOGGING=true
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/dating_optimizer_dev
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - backend_dev_logs:/app/logs
+    command: ["npm", "run", "dev"]
+    ports:
+      - "3000:3000"
+      - "9229:9229"  # Node.js debug port
+    
+  postgres:
+    environment:
+      - POSTGRES_DB=dating_optimizer_dev
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "5433:5432"  # Different port for development
+    
+  redis:
+    command: >
+      redis-server 
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD:-redis123}
+    ports:
+      - "6380:6379"  # Different port for development
+    
+  # Database migration service
+  db-migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: builder
+    command: ["npm", "run", "migrate:latest"]
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/dating_optimizer_dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    networks:
+      - dating-optimizer-network
+    
+  # Database seeding service
+  db-seed:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: builder
+    command: ["npm", "run", "seed:run"]
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/dating_optimizer_dev
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+    volumes:
+      - ./backend:/app
+    networks:
+      - dating-optimizer-network
+    
+  # pgAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: dating-optimizer-pgadmin-dev
+    restart: unless-stopped
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@dating-optimizer.dev
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_PASSWORD:-admin123}
+      - PGADMIN_CONFIG_SERVER_MODE=False
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - dating-optimizer-network
+    
+  # Redis Commander for Redis management
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: dating-optimizer-redis-commander-dev
+    restart: unless-stopped
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redis123}
+    ports:
+      - "8082:8081"
+    depends_on:
+      - redis
+    networks:
+      - dating-optimizer-network
+    
+  # MailHog for email testing
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: dating-optimizer-mailhog-dev
+    restart: unless-stopped
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - dating-optimizer-network
+
+  # Disable production services in development
+  nginx:
+    profiles: ["production"]
+    
+  prometheus:
+    profiles: ["production", "monitoring"]
+    
+  grafana:
+    profiles: ["production", "monitoring"]
+    
+  elasticsearch:
+    profiles: ["production", "logging"]
+    
+  kibana:
+    profiles: ["production", "logging"]
+    
+  filebeat:
+    profiles: ["production", "logging"]
+
+# Development-specific volumes
+volumes:
+  backend_dev_logs:
+    driver: local

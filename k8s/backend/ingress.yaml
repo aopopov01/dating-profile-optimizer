@@ -1,0 +1,188 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dating-optimizer-backend-ingress
+  namespace: ${NAMESPACE:-dating-optimizer-production}
+  labels:
+    app: dating-optimizer-backend
+    component: ingress
+    environment: ${ENVIRONMENT:-production}
+  annotations:
+    # AWS Load Balancer Controller
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/group.name: dating-optimizer-${ENVIRONMENT:-production}
+    alb.ingress.kubernetes.io/group.order: "10"
+    
+    # SSL and Certificate
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/certificate-arn: ${CERTIFICATE_ARN}
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS-1-2-2017-01
+    
+    # Health Checks
+    alb.ingress.kubernetes.io/healthcheck-path: /api/v1/health
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "15"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
+    alb.ingress.kubernetes.io/success-codes: "200,302"
+    
+    # Load Balancer Configuration
+    alb.ingress.kubernetes.io/load-balancer-attributes: |
+      idle_timeout.timeout_seconds=60,
+      routing.http2.enabled=true,
+      access_logs.s3.enabled=true,
+      access_logs.s3.bucket=${ALB_LOGS_BUCKET:-dating-optimizer-alb-logs},
+      access_logs.s3.prefix=dating-optimizer-${ENVIRONMENT:-production},
+      deletion_protection.enabled=true,
+      load_balancing.cross_zone.enabled=true
+    
+    # Security Headers
+    alb.ingress.kubernetes.io/actions.response-headers: |
+      {
+        "type": "fixed-response",
+        "fixedResponseConfig": {
+          "contentType": "text/plain",
+          "statusCode": "200",
+          "messageBody": "OK"
+        },
+        "responseHeaders": {
+          "X-Frame-Options": "DENY",
+          "X-Content-Type-Options": "nosniff",
+          "X-XSS-Protection": "1; mode=block",
+          "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+          "Referrer-Policy": "strict-origin-when-cross-origin",
+          "Content-Security-Policy": "default-src 'self'"
+        }
+      }
+    
+    # Rate Limiting (using external service)
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    
+    # CORS Configuration
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://dating-optimizer.com,https://app.dating-optimizer.com"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization"
+    nginx.ingress.kubernetes.io/cors-expose-headers: "X-RateLimit-Remaining,X-RateLimit-Reset"
+    nginx.ingress.kubernetes.io/cors-max-age: "1728000"
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    
+    # Monitoring
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  rules:
+  # Production API
+  - host: ${API_DOMAIN:-api.dating-optimizer.com}
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: dating-optimizer-backend-service
+            port:
+              number: 80
+      - path: /health
+        pathType: Prefix
+        backend:
+          service:
+            name: dating-optimizer-backend-service
+            port:
+              number: 80
+      - path: /metrics
+        pathType: Prefix
+        backend:
+          service:
+            name: dating-optimizer-backend-service
+            port:
+              number: 9090
+  
+  # Staging API (if staging environment)
+  - host: ${STAGING_API_DOMAIN:-staging-api.dating-optimizer.com}
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: dating-optimizer-backend-service
+            port:
+              number: 80
+      - path: /health
+        pathType: Prefix
+        backend:
+          service:
+            name: dating-optimizer-backend-service
+            port:
+              number: 80
+  
+  # Admin API (restricted access)
+  - host: ${ADMIN_API_DOMAIN:-admin-api.dating-optimizer.com}
+    http:
+      paths:
+      - path: /api/v1/admin
+        pathType: Prefix
+        backend:
+          service:
+            name: dating-optimizer-backend-service
+            port:
+              number: 80
+  
+  tls:
+  - hosts:
+    - ${API_DOMAIN:-api.dating-optimizer.com}
+    - ${STAGING_API_DOMAIN:-staging-api.dating-optimizer.com}
+    - ${ADMIN_API_DOMAIN:-admin-api.dating-optimizer.com}
+    secretName: dating-optimizer-tls-secret
+---
+# Network Policy for additional security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dating-optimizer-backend-netpol
+  namespace: ${NAMESPACE:-dating-optimizer-production}
+  labels:
+    app: dating-optimizer-backend
+    component: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: dating-optimizer-backend
+      component: backend
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    - podSelector:
+        matchLabels:
+          app: dating-optimizer-frontend
+    ports:
+    - protocol: TCP
+      port: 3000
+    - protocol: TCP
+      port: 9090
+  egress:
+  - to: []  # Allow all outbound traffic
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 5432  # PostgreSQL
+    - protocol: TCP
+      port: 6379  # Redis
+    - protocol: UDP
+      port: 53   # DNS
