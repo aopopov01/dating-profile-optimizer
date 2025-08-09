@@ -1,0 +1,110 @@
+# Trivy Security Scanner Configuration for Production Mobile Apps
+
+# Global configuration
+format: sarif
+output: trivy-results.sarif
+exit-code: 1
+severity: HIGH,CRITICAL
+quiet: false
+debug: false
+
+# Scanner settings
+scan:
+  security-checks: vuln,secret,config
+  scanners: vuln,secret,misconfig
+  skip-files: 
+    - "*.test.js"
+    - "*.spec.js"
+    - "*.test.ts"
+    - "*.spec.ts"
+    - "**/test/**"
+    - "**/tests/**"
+    - "**/spec/**"
+    - "**/node_modules/**"
+    - "**/.git/**"
+    - "**/vendor/**"
+  skip-dirs:
+    - node_modules
+    - .git
+    - vendor
+    - coverage
+    - dist
+    - build
+
+# Vulnerability scanning configuration
+vulnerability:
+  type: 
+    - os
+    - library
+  ignore-unfixed: false
+  ignore-policy: .trivyignore
+
+# Secret scanning configuration  
+secret:
+  config: trivy-secret.yaml
+
+# Misconfig scanning
+misconfig:
+  severity: HIGH,CRITICAL
+  namespaces: 
+    - builtin.dockerfile
+    - builtin.kubernetes
+    - builtin.terraform
+    - builtin.yaml
+  policy: 
+    - appshield
+    - builtin
+  trace: false
+
+# Docker/Container specific settings
+container:
+  ignore-statuses:
+    - end-of-life
+  platform: linux/amd64,linux/arm64
+
+# Kubernetes specific settings
+kubernetes:
+  namespaces:
+    - dating-optimizer-production
+    - linkedin-headshot-production
+    - dating-optimizer-staging
+    - linkedin-headshot-staging
+  cluster-role: true
+  rbac-assessment: true
+
+# Output configuration
+report:
+  summary: true
+  
+# Database settings
+db:
+  repository: ghcr.io/aquasecurity/trivy-db
+  skip-update: false
+
+# Cache settings
+cache:
+  dir: /tmp/.trivy
+  clear: false
+
+# Server settings (when running in server mode)
+server:
+  listen: 127.0.0.1:4954
+  token: ""
+  custom-headers: {}
+
+# REGO policy settings
+policy:
+  trace: false
+  config-data: []
+  data: []
+  policy-bundle-repository: ""
+
+# License scanning
+license:
+  full: false
+  ignored: 
+    - GPL-2.0
+    - GPL-3.0
+  confidences:
+    - high
+    - medium

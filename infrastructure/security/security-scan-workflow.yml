@@ -1,0 +1,369 @@
+# Security Scanning Workflow for Mobile Apps Infrastructure
+# This workflow should be integrated into CI/CD pipelines
+
+name: Security Scanning Workflow
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Run nightly security scans
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Allow manual triggers
+
+env:
+  REGISTRY: ghcr.io
+  TRIVY_VERSION: 0.48.1
+  COSIGN_VERSION: 2.2.1
+
+jobs:
+  # Static Application Security Testing (SAST)
+  sast-scan:
+    name: Static Code Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run CodeQL Analysis
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript, typescript
+          config-file: .github/codeql/codeql-config.yml
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript"
+
+      - name: Run Semgrep SAST
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/secrets
+            p/owasp-top-ten
+            p/react
+            p/nodejs
+          generateSarif: "1"
+
+      - name: Upload Semgrep results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep.sarif
+
+  # Secret Scanning
+  secret-scan:
+    name: Secret Detection
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Trivy secret scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-secrets.sarif'
+          severity: 'HIGH,CRITICAL'
+          scanners: 'secret'
+
+      - name: Upload Trivy secret results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-secrets.sarif
+
+      - name: Run GitLeaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+  # Infrastructure as Code (IaC) Security
+  iac-scan:
+    name: Infrastructure Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy IaC scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-iac.sarif'
+          severity: 'HIGH,CRITICAL'
+          scanners: 'misconfig'
+
+      - name: Upload Trivy IaC results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-iac.sarif
+
+      - name: Run Checkov
+        id: checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: .
+          framework: terraform,dockerfile,kubernetes
+          output_format: sarif
+          output_file_path: checkov.sarif
+          download_external_modules: true
+          soft_fail: false
+
+      - name: Upload Checkov results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: checkov.sarif
+
+  # Dependency Vulnerability Scanning
+  dependency-scan:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: [dating-optimizer, linkedin-headshot]
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: ${{ matrix.app }}/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./${{ matrix.app }}
+        run: npm ci --audit
+
+      - name: Run npm audit
+        working-directory: ./${{ matrix.app }}
+        run: |
+          npm audit --audit-level high --json > npm-audit-${{ matrix.app }}.json || true
+
+      - name: Run Trivy dependency scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: './${{ matrix.app }}'
+          format: 'sarif'
+          output: 'trivy-deps-${{ matrix.app }}.sarif'
+          severity: 'HIGH,CRITICAL'
+          scanners: 'vuln'
+
+      - name: Upload Trivy dependency results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-deps-${{ matrix.app }}.sarif
+
+      - name: Run Snyk
+        uses: snyk/actions/node@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high --sarif-file-output=snyk-${{ matrix.app }}.sarif
+          command: test
+          json: true
+
+      - name: Upload Snyk results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: snyk-${{ matrix.app }}.sarif
+
+  # Docker Image Security Scanning
+  container-scan:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    strategy:
+      matrix:
+        app: [dating-optimizer, linkedin-headshot]
+    permissions:
+      security-events: write
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./${{ matrix.app }}/backend
+          push: false
+          tags: ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.app }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Trivy container scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.app }}:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-container-${{ matrix.app }}.sarif'
+          severity: 'HIGH,CRITICAL'
+
+      - name: Upload Trivy container results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-container-${{ matrix.app }}.sarif
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: ${{ env.COSIGN_VERSION }}
+
+      - name: Sign container image
+        if: github.ref == 'refs/heads/main'
+        run: |
+          cosign sign --yes ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.app }}:${{ github.sha }}
+
+      - name: Verify container signature
+        if: github.ref == 'refs/heads/main'
+        run: |
+          cosign verify ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.app }}:${{ github.sha }} \
+            --certificate-identity-regexp=".*" \
+            --certificate-oidc-issuer-regexp=".*"
+
+  # License Compliance Scanning
+  license-scan:
+    name: License Compliance
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: [dating-optimizer, linkedin-headshot]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: ${{ matrix.app }}/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./${{ matrix.app }}
+        run: npm ci
+
+      - name: Run license-checker
+        working-directory: ./${{ matrix.app }}
+        run: |
+          npx license-checker --json --excludePrivatePackages > licenses-${{ matrix.app }}.json
+
+      - name: Check for forbidden licenses
+        working-directory: ./${{ matrix.app }}
+        run: |
+          # Fail if GPL licenses are found (except in dev dependencies)
+          if npx license-checker --excludePrivatePackages --onlyAllow 'MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;MPL-2.0;CC0-1.0;Unlicense' --failOn 'GPL'; then
+            echo "License check passed"
+          else
+            echo "Forbidden licenses found"
+            exit 1
+          fi
+
+  # Security Report Generation
+  security-report:
+    name: Generate Security Report
+    runs-on: ubuntu-latest
+    needs: [sast-scan, secret-scan, iac-scan, dependency-scan, license-scan]
+    if: always()
+    permissions:
+      security-events: read
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download security artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Generate security report
+        run: |
+          echo "# Security Scan Report - $(date)" > security-report.md
+          echo "## Summary" >> security-report.md
+          echo "- Static Analysis: ${{ needs.sast-scan.result }}" >> security-report.md
+          echo "- Secret Scan: ${{ needs.secret-scan.result }}" >> security-report.md
+          echo "- Infrastructure Scan: ${{ needs.iac-scan.result }}" >> security-report.md
+          echo "- Dependency Scan: ${{ needs.dependency-scan.result }}" >> security-report.md
+          echo "- License Compliance: ${{ needs.license-scan.result }}" >> security-report.md
+
+      - name: Upload security report
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report
+          path: security-report.md
+          retention-days: 30
+
+  # Security Notifications
+  notify-security:
+    name: Security Notifications
+    runs-on: ubuntu-latest
+    needs: [sast-scan, secret-scan, iac-scan, dependency-scan]
+    if: failure()
+    steps:
+      - name: Notify Slack on security issues
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          text: 'Security vulnerabilities detected in mobile apps infrastructure!'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Create security issue
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'Security vulnerabilities detected',
+              body: 'Security scan workflow has detected vulnerabilities. Please review the security report and take appropriate action.',
+              labels: ['security', 'high-priority']
+            });

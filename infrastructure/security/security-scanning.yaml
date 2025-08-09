@@ -1,0 +1,449 @@
+# Security Scanning and Compliance Configuration
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: security-system
+  labels:
+    name: security-system
+    purpose: security-scanning
+---
+# Falco Security Monitoring
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: falco
+  namespace: security-system
+  labels:
+    app: falco
+    component: security-monitor
+spec:
+  selector:
+    matchLabels:
+      app: falco
+  template:
+    metadata:
+      labels:
+        app: falco
+        component: security-monitor
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8765"
+    spec:
+      serviceAccountName: falco
+      hostNetwork: true
+      hostPID: true
+      containers:
+      - name: falco
+        image: falcosecurity/falco-no-driver:0.35.1
+        args:
+          - /usr/bin/falco
+          - --cri=/run/containerd/containerd.sock
+          - --k8s-api=https://kubernetes.default.svc.cluster.local
+          - --k8s-api-cert=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          - --k8s-api-token=/var/run/secrets/kubernetes.io/serviceaccount/token
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: dev-fs
+          mountPath: /host/dev
+        - name: proc-fs
+          mountPath: /host/proc
+          readOnly: true
+        - name: etc-fs
+          mountPath: /host/etc
+          readOnly: true
+        - name: var-run
+          mountPath: /host/var/run
+          readOnly: true
+        - name: sys-fs
+          mountPath: /sys
+          readOnly: true
+        - name: falco-config
+          mountPath: /etc/falco
+        env:
+        - name: KUBERNETES_SERVICE_HOST
+          value: kubernetes.default.svc.cluster.local
+        - name: KUBERNETES_SERVICE_PORT
+          value: "443"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+      volumes:
+      - name: dev-fs
+        hostPath:
+          path: /dev
+      - name: proc-fs
+        hostPath:
+          path: /proc
+      - name: etc-fs
+        hostPath:
+          path: /etc
+      - name: var-run
+        hostPath:
+          path: /var/run
+      - name: sys-fs
+        hostPath:
+          path: /sys
+      - name: falco-config
+        configMap:
+          name: falco-config
+---
+# Falco Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: falco-config
+  namespace: security-system
+data:
+  falco.yaml: |
+    rules_file:
+      - /etc/falco/falco_rules.yaml
+      - /etc/falco/falco_rules.local.yaml
+      - /etc/falco/k8s_audit_rules.yaml
+      - /etc/falco/application_rules.yaml
+
+    time_format_iso_8601: true
+    json_output: true
+    json_include_output_property: true
+    json_include_tags_property: true
+
+    log_stderr: true
+    log_syslog: false
+    log_level: info
+
+    priority: debug
+    
+    outputs:
+      rate: 1
+      max_burst: 1000
+
+    syslog_output:
+      enabled: false
+
+    file_output:
+      enabled: false
+
+    stdout_output:
+      enabled: true
+
+    webserver:
+      enabled: true
+      listen_port: 8765
+      k8s_healthz_endpoint: /healthz
+      ssl_enabled: false
+      ssl_certificate: /etc/ssl/falco/server.pem
+
+    grpc:
+      enabled: false
+
+    grpc_output:
+      enabled: false
+
+  application_rules.yaml: |
+    # Custom rules for mobile applications
+    - rule: Unauthorized API Access
+      desc: Detect unauthorized access attempts to mobile app APIs
+      condition: >
+        ka.verb in (get, post, put, delete) and
+        ka.uri.path startswith "/api/" and
+        ka.response_code >= 401 and ka.response_code <= 403
+      output: >
+        Unauthorized API access attempt (user=%ka.user.name verb=%ka.verb 
+        uri=%ka.uri.path response_code=%ka.response_code source=%ka.source_ips)
+      priority: WARNING
+      tags: [mobile-app, api, security, authentication]
+
+    - rule: High Volume API Requests
+      desc: Detect potential DDoS or brute force attacks
+      condition: >
+        ka.verb in (get, post, put, delete) and
+        ka.uri.path startswith "/api/" and
+        ka.response_code = 429
+      output: >
+        High volume API requests detected (user=%ka.user.name verb=%ka.verb 
+        uri=%ka.uri.path source=%ka.source_ips count=%ka.request_count)
+      priority: WARNING
+      tags: [mobile-app, api, security, rate-limiting]
+
+    - rule: Sensitive Data Access
+      desc: Monitor access to sensitive endpoints
+      condition: >
+        ka.verb in (get, post, put, delete) and
+        (ka.uri.path contains "/payment" or
+         ka.uri.path contains "/personal" or
+         ka.uri.path contains "/profile")
+      output: >
+        Sensitive data access (user=%ka.user.name verb=%ka.verb 
+        uri=%ka.uri.path source=%ka.source_ips)
+      priority: INFO
+      tags: [mobile-app, api, sensitive-data, privacy]
+
+    - rule: Database Connection Anomaly
+      desc: Detect unusual database connection patterns
+      condition: >
+        spawned_process and proc.name in (psql, mysql, redis-cli) and
+        not proc.pname in (node, java, python)
+      output: >
+        Suspicious database connection (command=%proc.cmdline pid=%proc.pid 
+        parent=%proc.pname container=%container.name)
+      priority: WARNING
+      tags: [mobile-app, database, security, anomaly]
+---
+# ServiceAccount for Falco
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: falco
+  namespace: security-system
+---
+# ClusterRole for Falco
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: falco
+rules:
+- apiGroups: [""]
+  resources: ["pods", "nodes", "namespaces", "events", "services"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets", "daemonsets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["networkpolicies"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: falco
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: falco
+subjects:
+- kind: ServiceAccount
+  name: falco
+  namespace: security-system
+---
+# Trivy Security Scanner
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trivy-config
+  namespace: security-system
+data:
+  trivy.yaml: |
+    format: json
+    severity: HIGH,CRITICAL
+    ignore-unfixed: true
+    skip-files:
+      - "**/.git/**"
+      - "**/node_modules/**"
+    skip-dirs:
+      - "**/.git/**"
+      - "**/node_modules/**"
+---
+# CronJob for Trivy scanning
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: trivy-scanner
+  namespace: security-system
+  labels:
+    app: trivy-scanner
+    component: security-scan
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: trivy-scanner
+            image: aquasec/trivy:0.45.0
+            command:
+            - /bin/sh
+            - -c
+            - |
+              # Scan container images
+              trivy image --format json --severity HIGH,CRITICAL \
+                ${ECR_REGISTRY}/linkedin-headshot/backend:latest > /tmp/linkedin-backend-scan.json
+              trivy image --format json --severity HIGH,CRITICAL \
+                ${ECR_REGISTRY}/dating-optimizer/backend:latest > /tmp/dating-backend-scan.json
+              
+              # Upload results to S3
+              aws s3 cp /tmp/linkedin-backend-scan.json s3://${SECURITY_BUCKET}/scans/$(date +%Y-%m-%d)/linkedin-backend/
+              aws s3 cp /tmp/dating-backend-scan.json s3://${SECURITY_BUCKET}/scans/$(date +%Y-%m-%d)/dating-backend/
+            env:
+            - name: ECR_REGISTRY
+              value: "${ECR_REGISTRY}"
+            - name: SECURITY_BUCKET
+              value: "${SECURITY_BUCKET}"
+            - name: AWS_DEFAULT_REGION
+              value: "${AWS_REGION}"
+            volumeMounts:
+            - name: docker-sock
+              mountPath: /var/run/docker.sock
+            - name: trivy-cache
+              mountPath: /root/.cache/trivy
+          volumes:
+          - name: docker-sock
+            hostPath:
+              path: /var/run/docker.sock
+          - name: trivy-cache
+            emptyDir: {}
+          restartPolicy: OnFailure
+---
+# OPA Gatekeeper for Policy Enforcement
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gatekeeper-system
+  labels:
+    admission.gatekeeper.sh/ignore: no-self-managing
+    control-plane: controller-manager
+    gatekeeper.sh/system: "yes"
+---
+# Security Policies with OPA Gatekeeper
+apiVersion: templates.gatekeeper.sh/v1beta1
+kind: ConstraintTemplate
+metadata:
+  name: k8srequiredsecuritycontext
+  namespace: gatekeeper-system
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sRequiredSecurityContext
+      validation:
+        properties:
+          runAsNonRoot:
+            type: boolean
+          runAsUser:
+            type: integer
+          fsGroup:
+            type: integer
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8srequiredsecuritycontext
+        
+        violation[{"msg": msg}] {
+          container := input.review.object.spec.containers[_]
+          not container.securityContext.runAsNonRoot
+          msg := "Container must run as non-root user"
+        }
+        
+        violation[{"msg": msg}] {
+          container := input.review.object.spec.containers[_]
+          container.securityContext.runAsUser == 0
+          msg := "Container cannot run as root (UID 0)"
+        }
+        
+        violation[{"msg": msg}] {
+          not input.review.object.spec.securityContext.fsGroup
+          msg := "Pod must specify fsGroup in security context"
+        }
+---
+apiVersion: config.gatekeeper.sh/v1alpha1
+kind: K8sRequiredSecurityContext
+metadata:
+  name: must-run-as-nonroot
+spec:
+  match:
+    - apiGroups: ["apps"]
+      kinds: ["Deployment", "StatefulSet", "DaemonSet"]
+      namespaces: ["linkedin-headshot-production", "linkedin-headshot-staging", 
+                  "dating-optimizer-production", "dating-optimizer-staging"]
+  parameters:
+    runAsNonRoot: true
+    runAsUser: 1001
+    fsGroup: 1001
+---
+# Network Policy Template
+apiVersion: templates.gatekeeper.sh/v1beta1
+kind: ConstraintTemplate
+metadata:
+  name: k8srequirednetworkpolicy
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sRequiredNetworkPolicy
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8srequirednetworkpolicy
+        
+        violation[{"msg": msg}] {
+          input.review.kind.kind == "Namespace"
+          not has_network_policy
+          msg := "Namespace must have an associated NetworkPolicy"
+        }
+        
+        has_network_policy {
+          # This would need to check for existing NetworkPolicies
+          # Implementation would query existing resources
+          true
+        }
+---
+# Pod Security Standards
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pod-security-standards
+  namespace: security-system
+data:
+  restricted-policy.yaml: |
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      annotations:
+        # Enforce restricted Pod Security Standard
+        pod-security.kubernetes.io/enforce: restricted
+        pod-security.kubernetes.io/audit: restricted
+        pod-security.kubernetes.io/warn: restricted
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1001
+          runAsGroup: 1001
+          seccompProfile:
+            type: RuntimeDefault
+---
+# Security Monitoring Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: security-monitoring
+  namespace: security-system
+  labels:
+    app: security-monitoring
+spec:
+  ports:
+  - port: 8765
+    targetPort: 8765
+    name: falco-metrics
+  - port: 9090
+    targetPort: 9090
+    name: security-metrics
+  selector:
+    app: falco

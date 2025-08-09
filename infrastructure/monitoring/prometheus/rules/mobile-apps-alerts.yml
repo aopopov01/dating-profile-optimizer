@@ -1,0 +1,247 @@
+groups:
+  - name: mobile-apps.rules
+    rules:
+      # Application Health Rules
+      - alert: ApplicationDown
+        expr: up{job=~"linkedin-headshot-backend|dating-optimizer-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: mobile-apps
+        annotations:
+          summary: "{{ $labels.job }} application is down"
+          description: "{{ $labels.job }} has been down for more than 1 minute."
+          runbook_url: "https://wiki.company.com/runbooks/app-down"
+
+      - alert: HighErrorRate
+        expr: |
+          (
+            rate(http_requests_total{job=~"linkedin-headshot-backend|dating-optimizer-backend",status=~"5.."}[5m]) /
+            rate(http_requests_total{job=~"linkedin-headshot-backend|dating-optimizer-backend"}[5m])
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          team: mobile-apps
+        annotations:
+          summary: "High error rate on {{ $labels.job }}"
+          description: "{{ $labels.job }} error rate is {{ $value | humanizePercentage }}"
+          runbook_url: "https://wiki.company.com/runbooks/high-error-rate"
+
+      - alert: HighResponseTime
+        expr: |
+          histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=~"linkedin-headshot-backend|dating-optimizer-backend"}[5m])) > 2.0
+        for: 5m
+        labels:
+          severity: warning
+          team: mobile-apps
+        annotations:
+          summary: "High response time on {{ $labels.job }}"
+          description: "95th percentile response time is {{ $value }}s on {{ $labels.job }}"
+          runbook_url: "https://wiki.company.com/runbooks/high-latency"
+
+      # Resource Usage Rules
+      - alert: HighCPUUsage
+        expr: |
+          rate(container_cpu_usage_seconds_total{container=~"linkedin-headshot-backend|dating-optimizer-backend"}[5m]) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+          team: mobile-apps
+        annotations:
+          summary: "High CPU usage on {{ $labels.container }}"
+          description: "CPU usage is above 80% for {{ $labels.container }} in {{ $labels.kubernetes_namespace }}"
+
+      - alert: HighMemoryUsage
+        expr: |
+          container_memory_usage_bytes{container=~"linkedin-headshot-backend|dating-optimizer-backend"} / 
+          container_spec_memory_limit_bytes{container=~"linkedin-headshot-backend|dating-optimizer-backend"} > 0.85
+        for: 10m
+        labels:
+          severity: warning
+          team: mobile-apps
+        annotations:
+          summary: "High memory usage on {{ $labels.container }}"
+          description: "Memory usage is above 85% for {{ $labels.container }} in {{ $labels.kubernetes_namespace }}"
+
+      - alert: PodCrashLooping
+        expr: |
+          rate(kube_pod_container_status_restarts_total{container=~"linkedin-headshot-backend|dating-optimizer-backend"}[10m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+          team: mobile-apps
+        annotations:
+          summary: "Pod {{ $labels.pod }} is crash looping"
+          description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is restarting frequently"
+
+      # Database Rules
+      - alert: DatabaseConnectionHigh
+        expr: |
+          pg_stat_activity_count{job="postgres-exporter"} > 80
+        for: 5m
+        labels:
+          severity: warning
+          team: mobile-apps
+        annotations:
+          summary: "High database connections"
+          description: "Database has {{ $value }} active connections"
+
+      - alert: DatabaseSlowQueries
+        expr: |
+          rate(pg_stat_statements_total_time{job="postgres-exporter"}[5m]) / 
+          rate(pg_stat_statements_calls{job="postgres-exporter"}[5m]) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          team: mobile-apps
+        annotations:
+          summary: "Slow database queries detected"
+          description: "Average query time is {{ $value }}ms"
+
+      # Redis Rules
+      - alert: RedisHighMemoryUsage
+        expr: |
+          redis_memory_used_bytes{job="redis-exporter"} / 
+          redis_memory_max_bytes{job="redis-exporter"} > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          team: mobile-apps
+        annotations:
+          summary: "Redis high memory usage"
+          description: "Redis memory usage is {{ $value | humanizePercentage }}"
+
+      - alert: RedisConnectionsHigh
+        expr: |
+          redis_connected_clients{job="redis-exporter"} > 100
+        for: 5m
+        labels:
+          severity: warning
+          team: mobile-apps
+        annotations:
+          summary: "High Redis connections"
+          description: "Redis has {{ $value }} connected clients"
+
+      # AI Processing Rules (LinkedIn Headshot)
+      - alert: AIProcessingTimeout
+        expr: |
+          rate(ai_processing_timeout_total{job="linkedin-headshot-backend"}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          team: mobile-apps
+          component: ai-processing
+        annotations:
+          summary: "AI processing timeouts detected"
+          description: "AI processing timeout rate is {{ $value }} per second"
+
+      - alert: ReplicateAPIErrors
+        expr: |
+          rate(replicate_api_errors_total{job="linkedin-headshot-backend"}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          team: mobile-apps
+          component: replicate-api
+        annotations:
+          summary: "Replicate API errors detected"
+          description: "Replicate API error rate is {{ $value }} per second"
+
+      # OpenAI API Rules (Dating Profile Optimizer)
+      - alert: OpenAIAPIErrors
+        expr: |
+          rate(openai_api_errors_total{job="dating-optimizer-backend"}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          team: mobile-apps
+          component: openai-api
+        annotations:
+          summary: "OpenAI API errors detected"
+          description: "OpenAI API error rate is {{ $value }} per second"
+
+      - alert: OpenAIAPIRateLimit
+        expr: |
+          rate(openai_api_rate_limit_total{job="dating-optimizer-backend"}[5m]) > 0.01
+        for: 2m
+        labels:
+          severity: warning
+          team: mobile-apps
+          component: openai-api
+        annotations:
+          summary: "OpenAI API rate limiting detected"
+          description: "OpenAI API rate limit hit {{ $value }} times per second"
+
+      # File Upload Rules
+      - alert: HighUploadFailureRate
+        expr: |
+          rate(file_upload_failures_total{job=~"linkedin-headshot-backend|dating-optimizer-backend"}[5m]) /
+          rate(file_upload_attempts_total{job=~"linkedin-headshot-backend|dating-optimizer-backend"}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          team: mobile-apps
+        annotations:
+          summary: "High upload failure rate on {{ $labels.job }}"
+          description: "Upload failure rate is {{ $value | humanizePercentage }} on {{ $labels.job }}"
+
+      # Payment Processing Rules (Dating Profile Optimizer)
+      - alert: PaymentProcessingErrors
+        expr: |
+          rate(payment_processing_errors_total{job="dating-optimizer-backend"}[5m]) > 0.01
+        for: 2m
+        labels:
+          severity: critical
+          team: mobile-apps
+          component: payments
+        annotations:
+          summary: "Payment processing errors detected"
+          description: "Payment error rate is {{ $value }} per second"
+
+      # Kubernetes Cluster Rules
+      - alert: KubernetesPodNotReady
+        expr: |
+          kube_pod_status_phase{phase=~"Pending|Unknown|Failed"} > 0
+        for: 5m
+        labels:
+          severity: warning
+          team: mobile-apps
+        annotations:
+          summary: "Kubernetes pod not ready"
+          description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has been in {{ $labels.phase }} state for more than 5 minutes"
+
+      - alert: KubernetesNodeNotReady
+        expr: |
+          kube_node_status_condition{condition="Ready",status="true"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "Kubernetes node not ready"
+          description: "Node {{ $labels.node }} has been not ready for more than 5 minutes"
+
+      # Ingress Rules
+      - alert: IngressHighLatency
+        expr: |
+          histogram_quantile(0.95, rate(nginx_ingress_controller_request_duration_seconds_bucket[5m])) > 5.0
+        for: 5m
+        labels:
+          severity: warning
+          team: mobile-apps
+        annotations:
+          summary: "High ingress latency"
+          description: "95th percentile ingress latency is {{ $value }}s"
+
+      # Storage Rules
+      - alert: PersistentVolumeUsageHigh
+        expr: |
+          kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          team: mobile-apps
+        annotations:
+          summary: "High persistent volume usage"
+          description: "PV {{ $labels.persistentvolumeclaim }} usage is {{ $value | humanizePercentage }}"
