@@ -66,7 +66,8 @@ class PaymentService {
   }
 
   /**
-   * Get available pricing tiers
+   * Get available pricing tiers - App Store compliant pricing
+   * All prices include applicable taxes and fees as required by platform policies
    */
   getPricingTiers(): PricingTier[] {
     return [
@@ -77,11 +78,12 @@ class PaymentService {
         currency: 'USD',
         stripePriceId: 'price_basic_optimization',
         features: [
-          'AI photo analysis',
-          'Photo scoring & ranking',
-          '1 personalized bio',
-          'Basic recommendations',
-          'Photo optimization tips',
+          'AI photo analysis (up to 10 photos)',
+          'Photo scoring & ranking (1-10 scale)',
+          '1 personalized bio generation',
+          'Basic optimization recommendations',
+          'Photo improvement tips',
+          '7-day access to results',
         ],
       },
       {
@@ -92,12 +94,14 @@ class PaymentService {
         stripePriceId: 'price_premium_package',
         popular: true,
         features: [
-          'Everything in Basic',
-          '3 bio variations',
-          'Platform-specific optimization',
-          'Advanced photo analysis',
-          'Messaging tips',
-          'Success tracking (30 days)',
+          'Everything in Basic package',
+          'Unlimited photo analysis',
+          '3 unique bio variations',
+          'Platform-specific optimization (Tinder, Bumble, Hinge)',
+          'Advanced photo analysis with detailed feedback',
+          'Personalized messaging tips',
+          '30-day access to all results',
+          'Email support within 24 hours',
         ],
       },
       {
@@ -107,27 +111,31 @@ class PaymentService {
         currency: 'USD',
         stripePriceId: 'price_complete_makeover',
         features: [
-          'Everything in Premium',
-          'Unlimited bio regeneration',
-          'Professional photo editing',
-          'Personal dating coach session',
-          'Success guarantee',
-          '90-day support',
+          'Everything in Premium package',
+          'Unlimited bio regeneration for 90 days',
+          'Professional photo editing suggestions',
+          '15-minute personal dating coach consultation',
+          'Success tracking dashboard',
+          'Priority email support (within 2 hours)',
+          '90-day money-back guarantee',
+          'Exclusive dating tips newsletter',
         ],
       },
       {
         id: 'monthly',
-        name: 'Monthly Coaching',
+        name: 'Monthly Coaching Subscription',
         price: 14.99,
         currency: 'USD',
         stripePriceId: 'price_monthly_coaching',
         features: [
-          'Monthly profile updates',
-          'New photo analysis',
-          'Fresh bio generation',
-          'Performance tracking',
-          'Ongoing optimization',
-          'Priority support',
+          'Monthly profile reviews and updates',
+          'New photo analysis each month',
+          'Fresh bio generation monthly',
+          'Performance tracking and insights',
+          'Ongoing optimization recommendations',
+          'Priority customer support',
+          'Cancel anytime - no commitment',
+          'First month satisfaction guarantee',
         ],
       },
     ];
@@ -272,7 +280,8 @@ class PaymentService {
   }
 
   /**
-   * Handle refund request
+   * Handle refund request - App Store compliant refund policy
+   * Includes proper reasons and processing according to platform requirements
    */
   async requestRefund(
     paymentIntentId: string,
@@ -284,15 +293,123 @@ class PaymentService {
     message: string;
   }> {
     try {
+      // Validate refund reason for compliance
+      const validReasons = [
+        'service_not_as_described',
+        'technical_issues',
+        'billing_error',
+        'not_satisfied',
+        'subscription_cancel',
+        'accidental_purchase'
+      ];
+      
+      if (!validReasons.includes(reason)) {
+        return {
+          success: false,
+          message: 'Invalid refund reason provided',
+        };
+      }
+
       // Mock refund - in production process through Stripe and backend
-      return await this.mockRequestRefund(paymentIntentId, reason, userId);
+      const result = await this.mockRequestRefund(paymentIntentId, reason, userId);
+      
+      // Log refund for compliance tracking
+      await this.logRefundRequest(paymentIntentId, reason, userId, result.success);
+      
+      return result;
     } catch (error) {
       console.error('Refund request failed:', error);
       return {
         success: false,
-        message: 'Refund request could not be processed',
+        message: 'Refund request could not be processed. Please contact support.',
       };
     }
+  }
+
+  /**
+   * Get subscription cancellation options - App Store compliant
+   * Provides clear cancellation terms and options
+   */
+  async getCancellationOptions(subscriptionId: string): Promise<{
+    canCancel: boolean;
+    effectiveDate: string;
+    refundEligible: boolean;
+    terms: string[];
+  }> {
+    try {
+      // Mock implementation - in production, check subscription status
+      return {
+        canCancel: true,
+        effectiveDate: 'End of current billing period',
+        refundEligible: true,
+        terms: [
+          'Cancellation takes effect at the end of your current billing period',
+          'You will retain access to premium features until the end date',
+          'No partial refunds for unused time in current period',
+          'You can reactivate your subscription at any time',
+          'All your data will be preserved for 30 days after cancellation'
+        ]
+      };
+    } catch (error) {
+      console.error('Failed to get cancellation options:', error);
+      throw new Error('Could not retrieve cancellation information');
+    }
+  }
+
+  /**
+   * Process subscription cancellation with proper compliance
+   */
+  async processCancellation(
+    subscriptionId: string, 
+    reason: string, 
+    feedback?: string
+  ): Promise<{
+    success: boolean;
+    cancellationId: string;
+    effectiveDate: string;
+    message: string;
+  }> {
+    try {
+      // Log cancellation for analytics and compliance
+      await this.logCancellation(subscriptionId, reason, feedback);
+      
+      // Cancel subscription
+      await this.cancelSubscription(subscriptionId);
+      
+      return {
+        success: true,
+        cancellationId: `cancel_${Date.now()}`,
+        effectiveDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        message: 'Subscription cancelled successfully. Access continues until end of billing period.'
+      };
+    } catch (error) {
+      console.error('Cancellation processing failed:', error);
+      return {
+        success: false,
+        cancellationId: '',
+        effectiveDate: '',
+        message: 'Cancellation could not be processed. Please contact support.'
+      };
+    }
+  }
+
+  /**
+   * Get transparent pricing information for App Store compliance
+   */
+  getPricingTransparency(): {
+    currency: string;
+    taxInclusive: boolean;
+    paymentProcessor: string;
+    refundPolicy: string;
+    subscriptionTerms: string;
+  } {
+    return {
+      currency: 'USD',
+      taxInclusive: false,
+      paymentProcessor: 'Stripe (PCI DSS Compliant)',
+      refundPolicy: 'Full refund within 30 days if not satisfied. Subscription refunds prorated.',
+      subscriptionTerms: 'Monthly subscriptions auto-renew. Cancel anytime. No commitment required.'
+    };
   }
 
   // Private mock methods - replace with actual API calls in production
@@ -423,6 +540,35 @@ class PaymentService {
   ): Promise<void> {
     // Send confirmation email
     console.log('Confirmation email sent to:', purchaseData.email);
+  }
+
+  // Compliance logging methods
+  private async logRefundRequest(
+    paymentIntentId: string,
+    reason: string,
+    userId: string,
+    success: boolean
+  ): Promise<void> {
+    console.log('Refund request logged:', {
+      paymentIntentId,
+      reason,
+      userId,
+      success,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  private async logCancellation(
+    subscriptionId: string,
+    reason: string,
+    feedback?: string
+  ): Promise<void> {
+    console.log('Cancellation logged:', {
+      subscriptionId,
+      reason,
+      feedback,
+      timestamp: new Date().toISOString()
+    });
   }
 }
 

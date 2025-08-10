@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- File provider paths for sharing optimized images -->
+    <!-- These paths define what files can be shared with other apps -->
+    
+    <!-- Temporary files for sharing optimized photos -->
+    <cache-path name="shared_images" path="shared/" />
+    
+    <!-- External cache for temporary exports -->
+    <external-cache-path name="external_shared" path="shared/" />
+    
+    <!-- Files directory for saving optimized profiles -->
+    <files-path name="optimized_profiles" path="optimized/" />
+    
+    <!-- External files for user exports -->
+    <external-files-path name="exports" path="exports/" />
+    
+</paths>

@@ -35,8 +35,34 @@
 			</dict>
 		</dict>
 	</dict>
+	<!-- Privacy Usage Descriptions - Required for App Store Compliance -->
+	<key>NSCameraUsageDescription</key>
+	<string>Dating Profile Optimizer needs camera access to take photos for your dating profile optimization. Photos are analyzed locally on your device for privacy.</string>
+	
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Dating Profile Optimizer needs photo library access to analyze your existing photos and help optimize your dating profile. Your photos remain private and secure.</string>
+	
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Save optimized photos directly to your photo library for easy sharing on dating apps.</string>
+	
+	<key>NSFaceIDUsageDescription</key>
+	<string>Use Face ID to securely access your dating profile data and protect your privacy.</string>
+	
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<string>Location access helps provide region-specific dating advice and optimize your profile for local dating culture. Location data is never shared or stored.</string>
+	
+	<!-- App Store Connect Age Rating Information -->
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.lifestyle</string>
+	
+	<!-- Content Rating - 17+ for dating app -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	
+	<!-- Privacy Nutrition Labels Support -->
+	<key>NSUserTrackingUsageDescription</key>
+	<string>This allows us to provide personalized dating advice and improve our AI optimization features while keeping your data anonymous.</string>
+	
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>

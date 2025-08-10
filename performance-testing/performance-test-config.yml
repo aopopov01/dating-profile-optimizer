@@ -1,0 +1,450 @@
+# Performance Testing Configuration for Dating Profile Optimizer
+# Comprehensive testing scenarios for dating app workloads
+
+# Global configuration
+global:
+  api_url: "http://localhost:3002"
+  test_duration: "10m"
+  ramp_duration: "2m"
+  max_vus: 500
+  data_retention: "24h"
+  report_format: ["html", "json", "junit"]
+
+# Environment-specific settings
+environments:
+  local:
+    api_url: "http://localhost:3002"
+    max_vus: 50
+    database_url: "postgresql://localhost:5432/dating_optimizer_test"
+    redis_url: "redis://localhost:6379"
+  
+  staging:
+    api_url: "https://staging-api.datingoptimizer.com"
+    max_vus: 200
+    database_url: "${STAGING_DB_URL}"
+    redis_url: "${STAGING_REDIS_URL}"
+  
+  production:
+    api_url: "https://api.datingoptimizer.com"
+    max_vus: 1000
+    database_url: "${PROD_DB_URL}"
+    redis_url: "${PROD_REDIS_URL}"
+
+# Test scenarios for dating app
+scenarios:
+  # User registration and onboarding flow
+  onboarding_flow:
+    description: "New user registration, profile creation, and first setup"
+    load_pattern: "constant"
+    virtual_users: 20
+    duration: "15m"
+    stages:
+      - duration: "2m"
+        target: 5
+      - duration: "10m"
+        target: 20
+      - duration: "3m"
+        target: 0
+    thresholds:
+      - metric: "http_req_duration"
+        condition: "p(95)<3000"
+      - metric: "http_req_failed"
+        condition: "rate<0.05"
+      - metric: "bio_generation_duration"
+        condition: "p(95)<10000"
+    tags:
+      - "scenario:onboarding"
+      - "priority:high"
+
+  # Active user browsing and swiping
+  active_browsing:
+    description: "Engaged users browsing profiles and swiping"
+    load_pattern: "ramping"
+    virtual_users: 100
+    duration: "20m"
+    stages:
+      - duration: "3m"
+        target: 30
+      - duration: "10m"
+        target: 100
+      - duration: "5m"
+        target: 150  # Peak usage
+      - duration: "2m"
+        target: 0
+    thresholds:
+      - metric: "profile_load_duration"
+        condition: "p(95)<1500"
+      - metric: "swipe_response_time"
+        condition: "p(99)<500"
+    tags:
+      - "scenario:browsing"
+      - "priority:critical"
+
+  # AI processing heavy load
+  ai_processing:
+    description: "Heavy AI operations - bio generation and photo analysis"
+    load_pattern: "constant"
+    virtual_users: 30
+    duration: "15m"
+    stages:
+      - duration: "2m"
+        target: 10
+      - duration: "10m"
+        target: 30
+      - duration: "3m"
+        target: 0
+    thresholds:
+      - metric: "bio_generation_duration"
+        condition: "p(95)<15000"
+      - metric: "photo_analysis_duration"
+        condition: "p(95)<20000"
+      - metric: "ai_error_rate"
+        condition: "rate<0.1"
+    resource_limits:
+      cpu: "80%"
+      memory: "85%"
+    tags:
+      - "scenario:ai"
+      - "priority:high"
+
+  # Peak evening usage simulation
+  peak_time:
+    description: "Evening peak usage with mixed activities"
+    load_pattern: "arrival_rate"
+    arrival_rate: 50  # requests per second
+    duration: "30m"
+    stages:
+      - duration: "5m"
+        target: 20
+      - duration: "15m"
+        target: 50  # Peak
+      - duration: "8m"
+        target: 30
+      - duration: "2m"
+        target: 10
+    activities:
+      - name: "browse_profiles"
+        weight: 40
+      - name: "swipe_actions"
+        weight: 30
+      - name: "check_messages"
+        weight: 20
+      - name: "update_profile"
+        weight: 10
+    thresholds:
+      - metric: "http_req_duration"
+        condition: "p(95)<2000"
+      - metric: "concurrent_users"
+        condition: "value<=200"
+    tags:
+      - "scenario:peak"
+      - "priority:critical"
+
+  # Stress test for breaking points
+  stress_test:
+    description: "Push system to breaking point"
+    load_pattern: "stress"
+    virtual_users: 500
+    duration: "20m"
+    stages:
+      - duration: "5m"
+        target: 100
+      - duration: "5m"
+        target: 300
+      - duration: "5m"
+        target: 500  # Breaking point
+      - duration: "5m"
+        target: 0
+    failure_criteria:
+      - metric: "http_req_failed"
+        condition: "rate>0.5"  # 50% failure rate = breaking point
+      - metric: "http_req_duration"
+        condition: "p(50)>10000"  # 10s median response time
+    tags:
+      - "scenario:stress"
+      - "priority:medium"
+
+  # Mobile app specific scenarios
+  mobile_scenarios:
+    description: "Mobile app behavior patterns"
+    load_pattern: "mobile"
+    virtual_users: 80
+    duration: "25m"
+    device_types:
+      - name: "high_end_mobile"
+        percentage: 30
+        characteristics:
+          cpu_power: "high"
+          memory: "8gb"
+          network: "5g"
+      - name: "mid_range_mobile"
+        percentage: 50
+        characteristics:
+          cpu_power: "medium"
+          memory: "4gb"
+          network: "4g"
+      - name: "low_end_mobile"
+        percentage: 20
+        characteristics:
+          cpu_power: "low"
+          memory: "2gb"
+          network: "3g"
+    mobile_patterns:
+      - name: "background_sync"
+        interval: "30s"
+      - name: "app_resume"
+        frequency: "5/hour"
+      - name: "offline_mode"
+        duration: "2m"
+    tags:
+      - "scenario:mobile"
+      - "priority:high"
+
+# Performance thresholds for dating app
+thresholds:
+  # API response times
+  response_times:
+    profile_load: "p(95)<1000ms"
+    image_upload: "p(95)<5000ms"
+    bio_generation: "p(95)<10000ms"
+    photo_analysis: "p(95)<15000ms"
+    swipe_action: "p(99)<500ms"
+    match_check: "p(95)<2000ms"
+    conversation_load: "p(95)<1500ms"
+
+  # System performance
+  system_performance:
+    cpu_usage: "<80%"
+    memory_usage: "<85%"
+    disk_io: "<70%"
+    network_io: "<60%"
+
+  # Database performance
+  database:
+    query_time: "p(95)<500ms"
+    connection_pool: "usage<90%"
+    cache_hit_rate: ">80%"
+
+  # Error rates
+  error_rates:
+    api_errors: "<5%"
+    ai_failures: "<10%"
+    image_failures: "<3%"
+    database_errors: "<1%"
+
+  # Business metrics
+  business_metrics:
+    profile_completion_rate: ">85%"
+    photo_upload_success: ">95%"
+    bio_generation_success: ">90%"
+    user_engagement_rate: ">70%"
+
+# Monitoring and alerting
+monitoring:
+  metrics_collection_interval: "10s"
+  
+  # System metrics
+  system_metrics:
+    - "cpu_usage"
+    - "memory_usage"
+    - "disk_usage"
+    - "network_io"
+    - "load_average"
+  
+  # Application metrics
+  app_metrics:
+    - "request_rate"
+    - "response_time"
+    - "error_rate"
+    - "active_users"
+    - "concurrent_sessions"
+  
+  # Dating app specific metrics
+  dating_metrics:
+    - "profile_views_per_second"
+    - "swipes_per_second"
+    - "matches_per_hour"
+    - "bio_generations_per_minute"
+    - "photo_analyses_per_minute"
+    - "conversion_rates"
+
+  # Alert conditions
+  alerts:
+    critical:
+      - condition: "response_time_p95 > 5000"
+        message: "Critical: Response time P95 exceeds 5 seconds"
+      - condition: "error_rate > 10%"
+        message: "Critical: Error rate exceeds 10%"
+      - condition: "cpu_usage > 90%"
+        message: "Critical: CPU usage exceeds 90%"
+      - condition: "memory_usage > 95%"
+        message: "Critical: Memory usage exceeds 95%"
+    
+    warning:
+      - condition: "response_time_p95 > 2000"
+        message: "Warning: Response time P95 exceeds 2 seconds"
+      - condition: "error_rate > 5%"
+        message: "Warning: Error rate exceeds 5%"
+      - condition: "bio_generation_time > 15000"
+        message: "Warning: Bio generation time exceeds 15 seconds"
+
+# Data generation for realistic testing
+test_data:
+  users:
+    total_count: 10000
+    
+    # User demographics for realistic testing
+    demographics:
+      age_distribution:
+        - range: "18-25"
+          percentage: 35
+        - range: "26-35"
+          percentage: 40
+        - range: "36-45"
+          percentage: 20
+        - range: "46+"
+          percentage: 5
+      
+      gender_distribution:
+        - type: "male"
+          percentage: 52
+        - type: "female"
+          percentage: 46
+        - type: "other"
+          percentage: 2
+    
+    # Profile data patterns
+    profiles:
+      bio_lengths:
+        - range: "50-150"
+          percentage: 60
+        - range: "151-300"
+          percentage: 30
+        - range: "301+"
+          percentage: 10
+      
+      photo_counts:
+        - count: 1
+          percentage: 20
+        - count: "2-3"
+          percentage: 40
+        - count: "4-6"
+          percentage: 35
+        - count: "7+"
+          percentage: 5
+      
+      interests:
+        popular:
+          - "travel"
+          - "music"
+          - "fitness"
+          - "food"
+          - "movies"
+          - "photography"
+          - "hiking"
+          - "reading"
+        weights:
+          - interest_count: "3-5"
+            percentage: 50
+          - interest_count: "6-8"
+            percentage: 30
+          - interest_count: "9+"
+            percentage: 20
+
+  # Realistic usage patterns
+  usage_patterns:
+    daily_activity:
+      peak_hours: ["19:00-22:00"]  # Evening peak
+      moderate_hours: ["12:00-14:00", "17:00-19:00"]
+      low_hours: ["22:00-08:00"]
+    
+    weekly_patterns:
+      high_activity: ["friday", "saturday", "sunday"]
+      moderate_activity: ["thursday", "monday"]
+      low_activity: ["tuesday", "wednesday"]
+    
+    seasonal_trends:
+      high_season: ["january", "february", "september"]  # New Year, back to school
+      moderate_season: ["march", "april", "october", "november"]
+      low_season: ["may", "june", "july", "august", "december"]  # Summer, holidays
+
+# Reporting configuration
+reporting:
+  output_formats:
+    - "html"
+    - "json"
+    - "junit"
+    - "csv"
+  
+  html_report:
+    template: "dating_app_report.html"
+    include_charts: true
+    include_detailed_metrics: true
+  
+  dashboards:
+    - name: "real_time_performance"
+      update_interval: "5s"
+      metrics:
+        - "response_times"
+        - "error_rates"
+        - "active_users"
+        - "system_resources"
+    
+    - name: "business_metrics"
+      update_interval: "1m"
+      metrics:
+        - "user_engagement"
+        - "conversion_rates"
+        - "feature_usage"
+        - "revenue_metrics"
+
+# Integration settings
+integrations:
+  # CI/CD pipeline integration
+  cicd:
+    jenkins:
+      job_name: "dating-app-performance-tests"
+      trigger_conditions:
+        - "code_deploy"
+        - "scheduled_daily"
+      failure_criteria:
+        - "any_threshold_exceeded"
+    
+    github_actions:
+      workflow: "performance-testing.yml"
+      on_events: ["push", "pull_request"]
+  
+  # Monitoring tools
+  monitoring_tools:
+    prometheus:
+      endpoint: "http://prometheus:9090"
+      metrics_prefix: "dating_app"
+    
+    grafana:
+      dashboard_id: "dating-app-performance"
+      alert_channels: ["slack", "email"]
+    
+    datadog:
+      api_key: "${DATADOG_API_KEY}"
+      tags: ["env:${ENVIRONMENT}", "app:dating-optimizer"]
+
+# Resource requirements
+resources:
+  test_runner:
+    cpu: "4 cores"
+    memory: "8GB"
+    storage: "50GB"
+  
+  test_environment:
+    backend:
+      instances: 3
+      cpu: "2 cores each"
+      memory: "4GB each"
+    
+    database:
+      instance_type: "medium"
+      connections: 100
+    
+    cache:
+      memory: "2GB"
+      connections: 500

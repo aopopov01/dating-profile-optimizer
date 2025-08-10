@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <!-- Dating Profile Optimizer Data Extraction Rules (Android 12+) -->
+    <!-- These rules control what data can be extracted for cloud backup and device transfer -->
+    
+    <cloud-backup>
+        <!-- Exclude all sensitive dating-related data from cloud backups -->
+        <exclude domain="file" path="photos/" />
+        <exclude domain="file" path="profiles/" />
+        <exclude domain="file" path="user_data/" />
+        <exclude domain="file" path="ai_analysis/" />
+        <exclude domain="sharedpref" name="user_preferences" />
+        <exclude domain="sharedpref" name="payment_data" />
+        <exclude domain="sharedpref" name="biometric_keys" />
+        <exclude domain="database" name="profile_data.db" />
+        <exclude domain="database" name="analytics.db" />
+        
+        <!-- Include only basic app configuration -->
+        <include domain="sharedpref" name="app_config" />
+        <include domain="sharedpref" name="ui_settings" />
+    </cloud-backup>
+    
+    <device-transfer>
+        <!-- Allow minimal data transfer to new devices -->
+        <!-- Exclude all personal dating data for privacy -->
+        <exclude domain="file" path="photos/" />
+        <exclude domain="file" path="profiles/" />
+        <exclude domain="file" path="user_data/" />
+        <exclude domain="file" path="cache/" />
+        <exclude domain="sharedpref" name="user_preferences" />
+        <exclude domain="sharedpref" name="payment_data" />
+        <exclude domain="sharedpref" name="auth_tokens" />
+        <exclude domain="database" name="profile_data.db" />
+        
+        <!-- Include app preferences for better user experience -->
+        <include domain="sharedpref" name="app_settings" />
+        <include domain="sharedpref" name="onboarding_state" />
+    </device-transfer>
+</data-extraction-rules>

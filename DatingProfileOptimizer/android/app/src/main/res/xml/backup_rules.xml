@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Dating Profile Optimizer Backup Rules -->
+    <!-- Exclude sensitive dating profile data from backups -->
+    
+    <!-- Exclude all user photos and profile data -->
+    <exclude domain="file" path="photos/" />
+    <exclude domain="file" path="profiles/" />
+    <exclude domain="file" path="cache/" />
+    
+    <!-- Exclude security-related data -->
+    <exclude domain="sharedpref" name="biometric_prefs" />
+    <exclude domain="sharedpref" name="payment_cache" />
+    <exclude domain="sharedpref" name="user_tokens" />
+    
+    <!-- Exclude analytics and temporary data -->
+    <exclude domain="database" name="analytics.db" />
+    <exclude domain="file" path="temp/" />
+    <exclude domain="external" path="." />
+    
+    <!-- Include only non-sensitive app preferences -->
+    <include domain="sharedpref" name="app_settings" />
+    <include domain="sharedpref" name="ui_preferences" />
+</full-backup-content>

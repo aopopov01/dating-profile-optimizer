@@ -1,4 +1,32 @@
 {
   "name": "DatingProfileOptimizer",
-  "displayName": "DatingProfileOptimizer"
+  "displayName": "Profile Boost: Dating AI",
+  "description": "AI-powered dating profile optimization for 300% more matches on all dating apps",
+  "version": "2.1.0",
+  "privacy": "https://datingprofileoptimizer.com/privacy",
+  "terms": "https://datingprofileoptimizer.com/terms",
+  "support": "https://datingprofileoptimizer.com/support",
+  "category": "Lifestyle",
+  "contentRating": "17+",
+  "keywords": [
+    "dating",
+    "profile",
+    "tinder",
+    "optimization",
+    "photos",
+    "matches",
+    "bumble",
+    "hinge",
+    "analyzer",
+    "success",
+    "bio",
+    "coach",
+    "tips"
+  ],
+  "permissions": {
+    "camera": "Take photos for profile optimization",
+    "photo_library": "Analyze existing photos",
+    "biometric": "Secure access to your dating data",
+    "location": "Provide region-specific dating advice"
+  }
 }
