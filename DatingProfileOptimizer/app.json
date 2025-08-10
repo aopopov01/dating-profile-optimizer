@@ -3,9 +3,15 @@
   "displayName": "Profile Boost: Dating AI",
   "description": "AI-powered dating profile optimization for 300% more matches on all dating apps",
   "version": "2.1.0",
-  "privacy": "https://datingprofileoptimizer.com/privacy",
-  "terms": "https://datingprofileoptimizer.com/terms",
-  "support": "https://datingprofileoptimizer.com/support",
+  "privacy": "https://xciterr.com/privacy",
+  "terms": "https://xciterr.com/terms",
+  "support": "info@xciterr.com",
+  "publisher": "Xciterr Ltd",
+  "publisherEmail": "info@xciterr.com",
+  "publisherWebsite": "https://xciterr.com",
+  "companyRegistration": "206478710",
+  "vatNumber": "BG206478710",
+  "companyAddress": "Sofia, Bulgaria",
   "category": "Lifestyle",
   "contentRating": "17+",
   "keywords": [
@@ -28,5 +34,13 @@
     "photo_library": "Analyze existing photos",
     "biometric": "Secure access to your dating data",
     "location": "Provide region-specific dating advice"
+  },
+  "contact": {
+    "email": "info@xciterr.com",
+    "company": "Xciterr Ltd",
+    "director": "Alexander Popov",
+    "registrationNumber": "206478710",
+    "vatNumber": "BG206478710",
+    "jurisdiction": "Bulgaria"
   }
 }

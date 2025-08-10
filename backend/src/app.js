@@ -100,7 +100,15 @@ app.get('/', (req, res) => {
     message: 'Dating Profile Optimizer API',
     version: '1.0.0',
     environment: process.env.NODE_ENV || 'development',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    company: {
+      name: 'Xciterr Ltd',
+      registration: '206478710',
+      vat: 'BG206478710',
+      jurisdiction: 'Bulgaria, Sofia',
+      director: 'Alexander Popov',
+      contact: 'info@xciterr.com'
+    }
   });
 });
 

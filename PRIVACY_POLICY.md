@@ -1,11 +1,18 @@
 # Privacy Policy - Dating Profile Optimizer
 
+**Company:** Xciterr Ltd  
+**Registration:** Bulgaria, Sofia  
+**Company Number:** 206478710  
+**VAT Number:** BG206478710  
+**Director:** Alexander Popov  
+**Contact:** info@xciterr.com
+
 **Effective Date:** August 10, 2025  
 **Last Updated:** August 10, 2025
 
 ## Overview
 
-Dating Profile Optimizer ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application ("App") and related services.
+Xciterr Ltd, trading as Dating Profile Optimizer ("we," "our," or "us"), a company registered in Bulgaria, Sofia (Company Number: 206478710, VAT: BG206478710), is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application ("App") and related services.
 
 **IMPORTANT FOR DATING APPS:** We understand that dating profiles contain highly personal and sensitive information. We implement industry-leading security measures to protect your data and give you complete control over your information.
 
@@ -206,4 +213,13 @@ This privacy policy complies with:
 **Last Reviewed:** August 10, 2025  
 **Version:** 2.1.0
 
-For questions about this privacy policy, please contact us at privacy@datingprofileoptimizer.com
+## Contact Information
+
+For questions about this privacy policy, please contact us at:
+
+- **Email:** info@xciterr.com
+- **Company:** Xciterr Ltd
+- **Address:** Sofia, Bulgaria  
+- **Company Number:** 206478710
+- **VAT Number:** BG206478710
+- **Director:** Alexander Popov
