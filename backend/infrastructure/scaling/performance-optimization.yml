@@ -1,0 +1,615 @@
+# Performance Optimization Configuration for Dating Profile Optimizer
+# Comprehensive performance tuning for production workloads
+
+performance_optimization:
+  # Application-level optimizations
+  application:
+    # Node.js runtime optimizations
+    nodejs:
+      # V8 engine tuning
+      v8_options:
+        max_old_space_size: 1024  # MB
+        max_new_space_size: 128   # MB
+        initial_heap_size: 256    # MB
+        
+      # Garbage collection tuning
+      garbage_collection:
+        strategy: "incremental"
+        expose_gc: true
+        trace_gc: false  # Disable in production
+        gc_interval: 30000  # 30 seconds
+        
+      # Event loop optimization
+      event_loop:
+        max_async_queue_size: 2000
+        warn_threshold: 100  # milliseconds
+        
+      # Cluster mode
+      cluster:
+        enabled: true
+        workers: "auto"  # CPU cores
+        restart_on_memory_limit: "800MB"
+        
+    # Express.js optimizations
+    express:
+      # Middleware optimization
+      middleware:
+        compression:
+          enabled: true
+          level: 6
+          threshold: "1kb"
+          filter: "text/plain,text/html,application/json,text/css,application/javascript"
+          
+        helmet:
+          enabled: true
+          content_security_policy: true
+          
+        cors:
+          enabled: true
+          origin: ["https://app.datingoptimizer.com"]
+          credentials: true
+          max_age: 86400
+          
+      # Request parsing
+      request_parsing:
+        body_parser:
+          limit: "10mb"
+          parameter_limit: 1000
+          
+        json_parser:
+          limit: "1mb"
+          strict: true
+          
+        url_encoded:
+          limit: "1mb"
+          extended: true
+          
+    # HTTP/2 and HTTP/3 optimization
+    http_optimization:
+      http2:
+        enabled: true
+        push_resources: true
+        
+      http3:
+        enabled: false  # Future consideration
+        
+      keep_alive:
+        enabled: true
+        timeout: 65000  # milliseconds
+        
+  # Database performance optimization
+  database:
+    # PostgreSQL optimization
+    postgresql:
+      # Connection settings
+      connection:
+        max_connections: 200
+        shared_buffers: "256MB"
+        effective_cache_size: "1GB"
+        maintenance_work_mem: "64MB"
+        checkpoint_completion_target: 0.9
+        wal_buffers: "16MB"
+        default_statistics_target: 100
+        random_page_cost: 1.1
+        effective_io_concurrency: 200
+        
+      # Query optimization
+      query_optimization:
+        # Indexes
+        indexes:
+          users_email_idx:
+            table: "users"
+            columns: ["email"]
+            type: "btree"
+            unique: true
+            
+          users_created_at_idx:
+            table: "users"
+            columns: ["created_at"]
+            type: "btree"
+            
+          photo_analyses_user_id_idx:
+            table: "photo_analyses"
+            columns: ["user_id"]
+            type: "btree"
+            
+          photo_analyses_composite_idx:
+            table: "photo_analyses"
+            columns: ["user_id", "created_at"]
+            type: "btree"
+            
+          subscriptions_user_status_idx:
+            table: "subscriptions"
+            columns: ["user_id", "status"]
+            type: "btree"
+            
+        # Query plans
+        query_plans:
+          enable_hashjoin: true
+          enable_mergejoin: true
+          enable_nestloop: true
+          
+        # Prepared statements
+        prepared_statements:
+          enabled: true
+          max_prepared_transactions: 100
+          
+      # Vacuum and maintenance
+      maintenance:
+        autovacuum: true
+        autovacuum_max_workers: 3
+        autovacuum_naptime: "1min"
+        
+        # Statistics collection
+        statistics:
+          track_activities: true
+          track_counts: true
+          track_io_timing: true
+          track_functions: "all"
+          
+      # WAL configuration
+      wal:
+        wal_level: "replica"
+        wal_sync_method: "fdatasync"
+        checkpoint_segments: 32
+        checkpoint_timeout: "5min"
+        
+      # Monitoring and logging
+      logging:
+        log_statement: "mod"  # Log modifications
+        log_min_duration_statement: 1000  # Log slow queries (1s)
+        log_line_prefix: "%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h"
+        
+    # Redis optimization
+    redis:
+      # Memory optimization
+      memory:
+        maxmemory: "1gb"
+        maxmemory_policy: "allkeys-lru"
+        
+        # Memory usage optimization
+        hash_max_ziplist_entries: 512
+        hash_max_ziplist_value: 64
+        list_max_ziplist_size: -2
+        set_max_intset_entries: 512
+        zset_max_ziplist_entries: 128
+        zset_max_ziplist_value: 64
+        
+      # Persistence
+      persistence:
+        save: "900 1 300 10 60 10000"  # RDB snapshots
+        stop_writes_on_bgsave_error: false
+        rdbcompression: true
+        rdbchecksum: true
+        
+        # AOF configuration
+        appendonly: true
+        appendfsync: "everysec"
+        no_appendfsync_on_rewrite: false
+        auto_aof_rewrite_percentage: 100
+        auto_aof_rewrite_min_size: "64mb"
+        
+      # Client configuration
+      client:
+        timeout: 300
+        tcp_keepalive: 60
+        tcp_backlog: 511
+        
+      # Cluster configuration
+      cluster:
+        enabled: true
+        require_full_coverage: false
+        node_timeout: 15000
+        cluster_migration_barrier: 1
+
+  # Caching strategies
+  caching:
+    # Multi-layer caching
+    layers:
+      # L1: In-memory application cache
+      l1_memory:
+        enabled: true
+        max_size: "256MB"
+        algorithm: "LRU"
+        ttl_default: "5m"
+        
+        # Cache configuration per data type
+        configurations:
+          user_profiles:
+            ttl: "15m"
+            max_entries: 10000
+            
+          ai_responses:
+            ttl: "1h"
+            max_entries: 5000
+            
+          templates:
+            ttl: "6h"
+            max_entries: 1000
+            
+      # L2: Redis cache
+      l2_redis:
+        enabled: true
+        ttl_default: "1h"
+        
+        # Cache warming strategies
+        warming:
+          popular_content:
+            enabled: true
+            refresh_interval: "30m"
+            
+          user_sessions:
+            enabled: true
+            preload_on_login: true
+            
+      # L3: CDN cache
+      l3_cdn:
+        provider: "cloudflare"
+        enabled: true
+        
+        # Cache rules
+        rules:
+          static_assets:
+            pattern: "*.{js,css,png,jpg,jpeg,gif,ico,svg,woff,woff2,webp}"
+            ttl: "1y"
+            compress: true
+            
+          api_responses:
+            pattern: "/api/public/*"
+            ttl: "5m"
+            vary: "Accept-Encoding,Authorization"
+            
+    # Cache invalidation
+    invalidation:
+      strategies:
+        # Time-based
+        ttl_based:
+          enabled: true
+          default_ttl: "1h"
+          
+        # Event-based
+        event_based:
+          enabled: true
+          events:
+            - "user_profile_updated"
+            - "subscription_changed"
+            - "ai_model_updated"
+            
+        # Manual invalidation
+        manual:
+          api_endpoint: "/admin/cache/invalidate"
+          authentication: "admin_token"
+          
+    # Cache monitoring
+    monitoring:
+      hit_ratio_threshold: 85  # Percent
+      miss_penalty_threshold: "100ms"
+      eviction_rate_threshold: "10/min"
+
+  # Content delivery optimization
+  cdn:
+    # Provider configuration
+    provider:
+      name: "cloudflare"
+      plan: "business"
+      
+    # Geographic distribution
+    regions:
+      - "North America"
+      - "Europe"
+      - "Asia-Pacific"
+      
+    # Performance features
+    features:
+      # Optimization
+      auto_minify:
+        html: true
+        css: true
+        javascript: true
+        
+      mirage: true  # Automatic image optimization
+      polish: "lossy"  # Image compression
+      
+      # Network optimization
+      http2: true
+      http3: true
+      ipv6: true
+      
+      # Security and performance
+      ddos_protection: true
+      waf: true
+      bot_management: true
+      
+    # Custom rules
+    rules:
+      # Image optimization
+      image_optimization:
+        formats: ["webp", "avif"]
+        quality: 85
+        auto_resize: true
+        
+      # Compression
+      compression:
+        brotli: true
+        gzip: true
+        level: "maximum"
+
+  # API performance optimization
+  api:
+    # Request optimization
+    request_optimization:
+      # Connection pooling
+      connection_pooling:
+        enabled: true
+        max_connections: 100
+        idle_timeout: "30s"
+        
+      # Request coalescing
+      request_coalescing:
+        enabled: true
+        window: "100ms"
+        
+      # Bulk operations
+      bulk_operations:
+        max_batch_size: 100
+        timeout: "30s"
+        
+    # Response optimization
+    response_optimization:
+      # Compression
+      compression:
+        enabled: true
+        algorithms: ["br", "gzip", "deflate"]
+        min_size: "1kb"
+        
+      # Response streaming
+      streaming:
+        enabled: true
+        chunk_size: "8kb"
+        
+      # Pagination
+      pagination:
+        default_page_size: 20
+        max_page_size: 100
+        
+    # GraphQL optimization (future)
+    graphql:
+      enabled: false
+      query_complexity_limit: 1000
+      query_depth_limit: 10
+      
+      # Caching
+      query_caching: true
+      persisted_queries: true
+
+  # File upload optimization
+  file_upload:
+    # Cloudinary optimization
+    cloudinary:
+      # Image transformations
+      transformations:
+        auto_format: true
+        auto_quality: true
+        fetch_format: "auto"
+        
+      # Upload optimization
+      upload_preset: "dating_optimizer_optimized"
+      resource_type: "auto"
+      
+      # Progressive JPEG
+      progressive: true
+      
+      # Eager transformations
+      eager_transformations:
+        - transformation: "c_fill,w_400,h_400,q_auto,f_auto"
+        - transformation: "c_fill,w_800,h_800,q_auto,f_auto"
+        
+    # Local processing optimization
+    local_processing:
+      # Image processing
+      sharp_config:
+        concurrency: 4
+        cache: true
+        simd: true
+        
+      # File validation
+      validation:
+        max_file_size: "50MB"
+        allowed_types: ["image/jpeg", "image/png", "image/webp"]
+        
+  # AI processing optimization
+  ai_processing:
+    # OpenAI API optimization
+    openai:
+      # Request optimization
+      requests:
+        max_tokens: 2000
+        temperature: 0.7
+        timeout: "30s"
+        
+        # Connection pooling
+        connection_pool:
+          max_connections: 20
+          idle_timeout: "60s"
+          
+      # Response caching
+      caching:
+        enabled: true
+        ttl: "24h"
+        cache_key_strategy: "content_hash"
+        
+      # Rate limiting
+      rate_limiting:
+        requests_per_minute: 100
+        tokens_per_minute: 50000
+        
+    # Image analysis optimization
+    image_analysis:
+      # Face detection optimization
+      face_detection:
+        confidence_threshold: 0.8
+        max_faces: 10
+        
+      # Batch processing
+      batch_processing:
+        enabled: true
+        batch_size: 5
+        timeout: "60s"
+
+  # Monitoring and profiling
+  monitoring:
+    # Application performance monitoring
+    apm:
+      enabled: true
+      service: "new_relic"  # or "datadog", "dynatrace"
+      
+      # Metrics collection
+      metrics:
+        response_time: true
+        throughput: true
+        error_rate: true
+        apdex_score: true
+        
+    # Profiling
+    profiling:
+      # CPU profiling
+      cpu_profiling:
+        enabled: false  # Enable only when debugging
+        sampling_rate: 100  # Hz
+        
+      # Memory profiling
+      memory_profiling:
+        enabled: false  # Enable only when debugging
+        heap_snapshots: true
+        
+      # Custom metrics
+      custom_metrics:
+        business_metrics: true
+        database_metrics: true
+        cache_metrics: true
+        
+    # Real User Monitoring (RUM)
+    rum:
+      enabled: true
+      sample_rate: 10  # Percent
+      
+      # Core Web Vitals
+      core_web_vitals:
+        lcp_threshold: "2.5s"  # Largest Contentful Paint
+        fid_threshold: "100ms"  # First Input Delay
+        cls_threshold: 0.1     # Cumulative Layout Shift
+
+  # Resource optimization
+  resource_optimization:
+    # CPU optimization
+    cpu:
+      # Process scheduling
+      scheduling:
+        nice_level: 0
+        ionice_level: 4
+        
+      # Thread pool tuning
+      thread_pools:
+        uv_threadpool_size: 16
+        
+    # Memory optimization
+    memory:
+      # Memory allocation
+      allocation:
+        strategy: "jemalloc"  # or "tcmalloc"
+        
+      # Memory limits
+      limits:
+        max_heap_size: "1GB"
+        max_buffer_size: "256MB"
+        
+    # I/O optimization
+    io:
+      # File system optimization
+      filesystem:
+        type: "ext4"
+        mount_options: "noatime,nobarrier"
+        
+      # Network optimization
+      network:
+        tcp_window_scaling: true
+        tcp_congestion_control: "bbr"
+        
+  # Load testing and benchmarking
+  load_testing:
+    # Test scenarios
+    scenarios:
+      # Baseline test
+      baseline:
+        virtual_users: 50
+        duration: "5m"
+        ramp_up: "1m"
+        
+      # Load test
+      load_test:
+        virtual_users: 200
+        duration: "10m"
+        ramp_up: "2m"
+        
+      # Stress test
+      stress_test:
+        virtual_users: 500
+        duration: "15m"
+        ramp_up: "3m"
+        
+      # Spike test
+      spike_test:
+        virtual_users: "50-1000-50"
+        duration: "10m"
+        spike_duration: "2m"
+        
+    # Performance targets
+    targets:
+      response_time_p50: "200ms"
+      response_time_p95: "1s"
+      response_time_p99: "2s"
+      error_rate: "<0.5%"
+      throughput: ">500 rps"
+      
+    # Tools configuration
+    tools:
+      k6:
+        config_file: "performance-tests/k6-config.js"
+        output_format: "json"
+        
+      artillery:
+        config_file: "performance-tests/artillery-config.yml"
+        
+  # Optimization recommendations
+  recommendations:
+    # Critical optimizations
+    critical:
+      - "Enable database connection pooling"
+      - "Implement multi-layer caching"
+      - "Optimize database indexes"
+      - "Enable HTTP/2"
+      - "Configure CDN properly"
+      
+    # High impact optimizations
+    high_impact:
+      - "Implement lazy loading"
+      - "Optimize image delivery"
+      - "Enable compression"
+      - "Implement request batching"
+      - "Optimize AI processing pipeline"
+      
+    # Medium impact optimizations
+    medium_impact:
+      - "Fine-tune garbage collection"
+      - "Optimize middleware stack"
+      - "Implement request coalescing"
+      - "Optimize database queries"
+      - "Configure resource limits"
+      
+    # Monitoring recommendations
+    monitoring:
+      - "Set up comprehensive APM"
+      - "Monitor Core Web Vitals"
+      - "Track business metrics"
+      - "Implement alerting thresholds"
+      - "Regular performance reviews"

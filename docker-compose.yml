@@ -57,12 +57,10 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - PGDATA=/var/lib/postgresql/data/pgdata
     ports:
-      - "5432:5432"
+      - "5435:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data/pgdata
       - ./postgres/init:/docker-entrypoint-initdb.d/
-      - ./postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
-    command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
     networks:
       - dating-optimizer-network
     healthcheck:
@@ -92,7 +90,7 @@ services:
       --maxmemory 512mb
       --maxmemory-policy allkeys-lru
     ports:
-      - "6379:6379"
+      - "6381:6379"
     volumes:
       - redis_data:/data
       - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
@@ -278,28 +276,12 @@ services:
 volumes:
   postgres_data:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /var/lib/dating-optimizer/postgres
   redis_data:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /var/lib/dating-optimizer/redis
   backend_logs:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /var/log/dating-optimizer/backend
   backend_uploads:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /var/lib/dating-optimizer/uploads
   nginx_cache:
     driver: local
   nginx_logs:

@@ -1,0 +1,545 @@
+# Production CI/CD Pipeline - Dating Profile Optimizer
+# Comprehensive pipeline with testing, security scanning, deployment, and rollback
+# Supports staging and production environments with blue-green deployment
+
+name: Production CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/**'
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+      force_deploy:
+        description: 'Force deployment (skip some checks)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: dating-profile-optimizer-backend
+  NODE_VERSION: '18'
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+
+jobs:
+  # Static Analysis and Security Scanning
+  security-scan:
+    name: Security Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          npm ci --include=dev --audit --fund=false
+          npm audit --audit-level=high
+
+      - name: Run ESLint security rules
+        working-directory: backend
+        run: npm run lint:security || true
+
+      - name: SAST with Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/secrets
+            p/owasp-top-ten
+            p/nodejs
+
+      - name: Dependency vulnerability scan
+        uses: github/super-linter@v4
+        env:
+          DEFAULT_BRANCH: main
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VALIDATE_JAVASCRIPT_ES: true
+          VALIDATE_DOCKERFILE_HADOLINT: true
+
+      - name: Docker security scan with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: './backend'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Secret scanning with TruffleHog
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: main
+          head: HEAD
+
+  # Comprehensive Testing Suite
+  test-suite:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    needs: security-scan
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_USER: test_user
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci --include=dev
+
+      - name: Wait for services
+        run: |
+          sleep 10
+          npx wait-on tcp:5432 -t 30000
+          npx wait-on tcp:6379 -t 30000
+
+      - name: Run database migrations
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
+        run: npm run migrate
+
+      - name: Run unit tests
+        working-directory: backend
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
+          REDIS_URL: redis://localhost:6379
+        run: npm run test:unit -- --coverage --detectOpenHandles
+
+      - name: Run integration tests
+        working-directory: backend
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
+          REDIS_URL: redis://localhost:6379
+        run: npm run test:integration
+
+      - name: Upload test coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./backend/coverage/lcov.info
+          flags: backend
+          name: backend-coverage
+
+      - name: Performance benchmarks
+        working-directory: backend
+        run: npm run test:performance || echo "Performance tests completed with warnings"
+
+  # Build and push Docker images
+  build-images:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [security-scan, test-suite]
+    if: github.event_name != 'pull_request'
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: network=host
+
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/infrastructure/docker/Dockerfile.prod
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+            VCS_REF=${{ github.sha }}
+            BUILD_VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: true
+          sbom: true
+
+      - name: Sign container image
+        uses: sigstore/cosign-installer@v3
+      
+      - name: Sign the container image
+        run: cosign sign --yes ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+          format: 'table'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+
+  # Deploy to Staging
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build-images
+    if: github.ref == 'refs/heads/develop' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
+    environment:
+      name: staging
+      url: https://api-staging.datingoptimizer.com
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup deployment tools
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+          
+          curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+          chmod 700 get_helm.sh
+          ./get_helm.sh
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > ~/.kube/config
+          kubectl config use-context staging-cluster
+
+      - name: Deploy to staging with Helm
+        run: |
+          helm upgrade --install dating-optimizer-staging ./backend/infrastructure/helm \
+            --namespace staging \
+            --create-namespace \
+            --set image.repository=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }} \
+            --set image.tag=${{ github.sha }} \
+            --set environment=staging \
+            --set replicaCount=2 \
+            --set ingress.hosts[0].host=api-staging.datingoptimizer.com \
+            --set postgresql.auth.username=${{ secrets.POSTGRES_USER_STAGING }} \
+            --set postgresql.auth.password=${{ secrets.POSTGRES_PASSWORD_STAGING }} \
+            --set redis.auth.password=${{ secrets.REDIS_PASSWORD_STAGING }} \
+            --wait --timeout=600s
+
+      - name: Verify staging deployment
+        run: |
+          kubectl rollout status deployment/dating-optimizer-staging -n staging --timeout=300s
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/instance=dating-optimizer-staging -n staging --timeout=300s
+
+      - name: Run smoke tests
+        run: |
+          sleep 30
+          curl -f -k https://api-staging.datingoptimizer.com/health || exit 1
+          curl -f -k https://api-staging.datingoptimizer.com/api/health || exit 1
+
+      - name: Staging performance test
+        run: |
+          # Run basic performance test against staging
+          npx k6 run --out json=./performance-results.json ./backend/performance-testing/staging-load-test.js || echo "Performance test completed"
+
+  # Deploy to Production with Blue-Green Strategy
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build-images, deploy-staging]
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production')
+    environment:
+      name: production
+      url: https://api.datingoptimizer.com
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup deployment tools
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+          
+          curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+          chmod 700 get_helm.sh
+          ./get_helm.sh
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > ~/.kube/config
+          kubectl config use-context production-cluster
+
+      - name: Pre-deployment backup
+        run: |
+          # Create database backup before deployment
+          kubectl create job --from=cronjob/postgres-backup backup-pre-deploy-$(date +%Y%m%d-%H%M%S) -n production
+
+      - name: Deploy blue-green to production
+        run: |
+          # Deploy to green environment (inactive)
+          helm upgrade --install dating-optimizer-green ./backend/infrastructure/helm \
+            --namespace production \
+            --create-namespace \
+            --set image.repository=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }} \
+            --set image.tag=${{ github.sha }} \
+            --set environment=production \
+            --set deployment.color=green \
+            --set replicaCount=3 \
+            --set ingress.hosts[0].host=api-green.datingoptimizer.com \
+            --set resources.limits.memory=1Gi \
+            --set resources.requests.memory=512Mi \
+            --set postgresql.auth.username=${{ secrets.POSTGRES_USER_PRODUCTION }} \
+            --set postgresql.auth.password=${{ secrets.POSTGRES_PASSWORD_PRODUCTION }} \
+            --set redis.auth.password=${{ secrets.REDIS_PASSWORD_PRODUCTION }} \
+            --wait --timeout=900s
+
+      - name: Run production smoke tests on green
+        run: |
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/instance=dating-optimizer-green -n production --timeout=600s
+          sleep 30
+          
+          # Test green deployment
+          for i in {1..5}; do
+            curl -f -k https://api-green.datingoptimizer.com/health && break
+            sleep 10
+          done
+          
+          # Run comprehensive health checks
+          curl -f -k https://api-green.datingoptimizer.com/api/health/detailed || exit 1
+
+      - name: Run production integration tests
+        run: |
+          # Run integration tests against green environment
+          npm install --prefix ./backend
+          npm run test:production --prefix ./backend || exit 1
+
+      - name: Switch traffic to green (blue-green cutover)
+        run: |
+          # Update ingress to point to green deployment
+          helm upgrade dating-optimizer-production ./backend/infrastructure/helm \
+            --namespace production \
+            --set image.repository=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }} \
+            --set image.tag=${{ github.sha }} \
+            --set environment=production \
+            --set deployment.color=green \
+            --set ingress.hosts[0].host=api.datingoptimizer.com \
+            --reuse-values
+
+      - name: Verify production deployment
+        run: |
+          sleep 30
+          
+          # Verify main production endpoint
+          for i in {1..10}; do
+            if curl -f -k https://api.datingoptimizer.com/health; then
+              echo "Production deployment successful"
+              break
+            fi
+            if [ $i -eq 10 ]; then
+              echo "Production deployment failed"
+              exit 1
+            fi
+            sleep 30
+          done
+
+      - name: Cleanup old blue deployment
+        run: |
+          # Keep blue for quick rollback, cleanup older deployments
+          helm uninstall dating-optimizer-blue -n production || echo "No blue deployment to cleanup"
+          
+          # Rename current green to blue for next deployment
+          kubectl patch deployment dating-optimizer-green -n production -p '{"metadata":{"name":"dating-optimizer-blue"}}'
+
+      - name: Notify deployment success
+        uses: 8398a7/action-slack@v3
+        if: success()
+        with:
+          status: success
+          text: "🚀 Production deployment successful! Version: ${{ github.sha }}"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # Rollback capability
+  rollback-production:
+    name: Rollback Production
+    runs-on: ubuntu-latest
+    if: failure() && github.ref == 'refs/heads/main'
+    needs: deploy-production
+    environment:
+      name: production-rollback
+
+    steps:
+      - name: Setup kubectl
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > ~/.kube/config
+
+      - name: Rollback to previous version
+        run: |
+          # Switch traffic back to blue (previous version)
+          kubectl patch service dating-optimizer-production -n production \
+            -p '{"spec":{"selector":{"app.kubernetes.io/instance":"dating-optimizer-blue"}}}'
+          
+          # Verify rollback
+          sleep 30
+          curl -f -k https://api.datingoptimizer.com/health || exit 1
+
+      - name: Notify rollback
+        uses: 8398a7/action-slack@v3
+        with:
+          status: warning
+          text: "⚠️ Production rollback executed due to deployment failure"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # Database migrations
+  migrate-database:
+    name: Database Migration
+    runs-on: ubuntu-latest
+    needs: build-images
+    if: github.ref == 'refs/heads/main' && !github.event.inputs.force_deploy
+    environment:
+      name: database-migration
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > ~/.kube/config
+
+      - name: Run database migrations
+        run: |
+          kubectl create job migration-$(date +%Y%m%d-%H%M%S) \
+            --from=cronjob/database-migration \
+            -n production
+          
+          # Wait for migration to complete
+          kubectl wait --for=condition=complete job/migration-$(date +%Y%m%d-%H%M%S) \
+            -n production --timeout=600s
+
+      - name: Verify migration
+        run: |
+          # Check if migrations were successful
+          kubectl logs job/migration-$(date +%Y%m%d-%H%M%S) -n production
+
+# Notification on failure
+  notify-failure:
+    name: Notify Failure
+    runs-on: ubuntu-latest
+    needs: [security-scan, test-suite, build-images, deploy-staging, deploy-production]
+    if: failure()
+    
+    steps:
+      - name: Notify failure
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          text: "❌ CI/CD Pipeline failed in ${{ github.workflow }} for ${{ github.ref }}"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

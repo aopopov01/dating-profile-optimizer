@@ -1,0 +1,110 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Professional Background Gradient -->
+    <linearGradient id="professionalGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0A66C2;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1E3A8A;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Camera Lens Gradient -->
+    <radialGradient id="lensGradient" cx="50%" cy="30%">
+      <stop offset="0%" style="stop-color:#F8FAFC;stop-opacity:1" />
+      <stop offset="40%" style="stop-color:#E2E8F0;stop-opacity:1" />
+      <stop offset="80%" style="stop-color:#64748B;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#334155;stop-opacity:1" />
+    </radialGradient>
+    
+    <!-- Inner Lens Gradient -->
+    <radialGradient id="innerLensGradient" cx="50%" cy="50%">
+      <stop offset="0%" style="stop-color:#1E293B;stop-opacity:1" />
+      <stop offset="70%" style="stop-color:#0F172A;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#000000;stop-opacity:1" />
+    </radialGradient>
+    
+    <!-- Professional Suit Gradient -->
+    <linearGradient id="suitGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1E293B;stop-opacity:0.9" />
+      <stop offset="100%" style="stop-color:#0F172A;stop-opacity:0.9" />
+    </linearGradient>
+    
+    <!-- Geometric Pattern -->
+    <pattern id="geometricPattern" patternUnits="userSpaceOnUse" width="60" height="60">
+      <rect width="60" height="60" fill="none"/>
+      <rect x="25" y="25" width="10" height="10" fill="rgba(255,255,255,0.05)"/>
+      <circle cx="30" cy="30" r="1" fill="rgba(255,255,255,0.1)"/>
+    </pattern>
+    
+    <!-- Professional Shadow -->
+    <filter id="professionalShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="2" dy="6" stdDeviation="8" flood-opacity="0.25"/>
+    </filter>
+    
+    <!-- Metallic Shine -->
+    <filter id="metallicShine" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+  
+  <!-- Professional Background -->
+  <circle cx="512" cy="512" r="460" fill="url(#professionalGradient)" filter="url(#professionalShadow)"/>
+  
+  <!-- Subtle Geometric Pattern -->
+  <circle cx="512" cy="512" r="460" fill="url(#geometricPattern)" opacity="0.3"/>
+  
+  <!-- Camera Body Base -->
+  <circle cx="512" cy="512" r="200" fill="#2D3748" opacity="0.8"/>
+  
+  <!-- Main Camera Lens Outer Ring -->
+  <circle cx="512" cy="512" r="180" fill="url(#lensGradient)" filter="url(#metallicShine)"/>
+  
+  <!-- Camera Lens Inner Ring -->
+  <circle cx="512" cy="512" r="160" fill="#4A5568" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+  
+  <!-- Lens Interior -->
+  <circle cx="512" cy="512" r="140" fill="url(#innerLensGradient)"/>
+  
+  <!-- Lens Aperture Blades -->
+  <g opacity="0.6">
+    <path d="M512 372 L560 420 L512 468 L464 420 Z" fill="rgba(100,116,139,0.8)"/>
+    <path d="M452 432 L512 372 L572 432 L512 492 Z" fill="rgba(100,116,139,0.6)" transform="rotate(45 512 432)"/>
+    <path d="M452 432 L512 372 L572 432 L512 492 Z" fill="rgba(100,116,139,0.4)" transform="rotate(90 512 432)"/>
+    <path d="M452 432 L512 372 L572 432 L512 492 Z" fill="rgba(100,116,139,0.6)" transform="rotate(135 512 432)"/>
+  </g>
+  
+  <!-- Professional Silhouette Inside Lens -->
+  <g opacity="0.8">
+    <!-- Head Shape -->
+    <circle cx="512" cy="450" r="35" fill="url(#suitGradient)"/>
+    
+    <!-- Suit Jacket -->
+    <path d="M460 485 Q460 470, 475 470 L549 470 Q564 470, 564 485 L564 580 Q564 590, 554 590 L470 590 Q460 590, 460 580 Z" 
+          fill="url(#suitGradient)"/>
+    
+    <!-- Tie -->
+    <path d="M500 485 Q500 480, 505 480 L519 480 Q524 480, 524 485 L524 570 Q524 575, 519 575 L505 575 Q500 575, 500 570 Z" 
+          fill="rgba(30,58,138,0.9)"/>
+    
+    <!-- Collar -->
+    <path d="M475 485 L505 500 L519 500 L549 485 L549 495 L525 505 L499 505 L475 495 Z" 
+          fill="rgba(248,250,252,0.9)"/>
+    
+    <!-- Suit Lapels -->
+    <path d="M475 485 Q480 480, 490 485 L500 500 L475 515 Z" fill="rgba(15,23,42,0.8)"/>
+    <path d="M549 485 Q544 480, 534 485 L524 500 L549 515 Z" fill="rgba(15,23,42,0.8)"/>
+  </g>
+  
+  <!-- Lens Highlight -->
+  <ellipse cx="460" cy="460" rx="40" ry="20" fill="rgba(255,255,255,0.4)" opacity="0.7" transform="rotate(-25 460 460)"/>
+  
+  <!-- Professional Lens Reflection -->
+  <ellipse cx="540" cy="480" rx="25" ry="15" fill="rgba(255,255,255,0.2)" opacity="0.5" transform="rotate(15 540 480)"/>
+  
+  <!-- Camera Body Details -->
+  <rect x="480" y="320" width="64" height="12" rx="6" fill="#4A5568"/>
+  <circle cx="470" cy="380" r="8" fill="#64748B"/>
+  <circle cx="554" cy="380" r="6" fill="#F59E0B"/>
+  
+  <!-- Bottom Professional Reflection -->
+  <ellipse cx="512" cy="720" rx="100" ry="15" fill="rgba(255,255,255,0.08)" opacity="0.6"/>
+</svg>

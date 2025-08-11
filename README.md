@@ -43,6 +43,82 @@ A mobile app that uses AI to analyze dating profile photos, select the best imag
 ### Prerequisites
 
 #### System Requirements
+- **Docker & Docker Compose** (for database services)
+- **Node.js 16+** and npm
+- **React Native development environment**:
+  - For iOS: Xcode (macOS only)
+  - For Android: Android Studio and Android SDK
+
+### 🎯 Quick Demo Setup (Recommended)
+
+**One-Command Demo Setup:**
+```bash
+# Clone and set up everything automatically
+chmod +x setup-demo.sh
+./setup-demo.sh
+```
+
+**Start Complete Demo:**
+```bash
+# Run everything with one command
+./demo.sh
+```
+
+**Run Services Separately:**
+```bash
+# Backend only
+./start-backend.sh
+
+# Mobile app only (in another terminal)
+./start-mobile.sh
+
+# Create demo data
+./create-demo-data.sh
+```
+
+**Run Mobile App:**
+```bash
+# For iOS
+cd DatingProfileOptimizer
+npx react-native run-ios
+
+# For Android
+cd DatingProfileOptimizer
+npx react-native run-android
+```
+
+### 🔐 Demo Credentials
+
+**Email**: demo@example.com  
+**Password**: DemoPass123!
+
+### 🌐 Demo URLs
+
+- **Backend API**: http://localhost:3004
+- **API Documentation**: http://localhost:3004/api
+- **Health Check**: http://localhost:3004/health
+
+### 🎭 Demo Features
+
+**Mock AI Services:**
+- ✅ AI-Powered Bio Generation (Mock responses without API calls)
+- ✅ Photo Analysis & Scoring (Mock computer vision feedback)
+- ✅ LinkedIn Headshot Generator (Mock professional enhancement)
+
+**Free Tier Integrations:**
+- ✅ Cloudinary (25 credits/month for image storage)
+- ✅ Mixpanel (1,000 users/month for analytics)
+- ✅ Google Analytics 4 (10M events/month)
+
+**Demo Data:**
+- Pre-configured demo user account
+- Sample analytics data and charts
+- Mock subscription and payment flows
+- Simulated cloud storage operations
+
+### Manual Setup (Alternative)
+
+#### System Requirements
 - Node.js 18+ (LTS recommended)
 - npm 8+ or Yarn 1.22+
 - Git 2.25+
@@ -65,38 +141,36 @@ A mobile app that uses AI to analyze dating profile photos, select the best imag
 - **Cache**: Redis 6+ (or use Docker)
 - **Text Editor**: VS Code with React Native Tools extension recommended
 
-### Quick Start
+#### Manual Setup Steps
 
 ```bash
 # 1. Clone the repository
 git clone https://github.com/yourusername/dating-profile-optimizer.git
 cd dating-profile-optimizer
 
-# 2. Install root dependencies
-npm install
-
-# 3. Set up environment variables (see Environment Setup section below)
+# 2. Set up backend environment
+cd backend
 cp .env.example .env
 # Edit .env with your configuration
 
-# 4. Start backend services with Docker
-cd backend
+# 3. Start backend services with Docker
 docker-compose up -d
 
-# 5. Run database migrations
+# 4. Install dependencies and run migrations
+npm install
 npm run migrate
 
-# 6. Start the backend in development mode
-npm run dev
+# 5. Start the backend in development mode
+npm start
 
-# 7. In a new terminal, install mobile app dependencies
+# 6. In a new terminal, set up mobile app
 cd ../DatingProfileOptimizer
 npm install
 
-# 8. For iOS only (macOS users)
+# 7. For iOS only (macOS users)
 cd ios && pod install && cd ..
 
-# 9. Start the React Native app
+# 8. Start the React Native app
 # For Android:
 npx react-native run-android
 

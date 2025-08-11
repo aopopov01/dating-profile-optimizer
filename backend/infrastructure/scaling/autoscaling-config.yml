@@ -1,0 +1,566 @@
+# Auto-scaling Configuration for Dating Profile Optimizer
+# Comprehensive scaling strategy for high availability and cost optimization
+
+autoscaling:
+  # Application tier scaling
+  application:
+    # Horizontal Pod Autoscaler (HPA) configuration
+    hpa:
+      api_service:
+        min_replicas: 3
+        max_replicas: 20
+        target_cpu_utilization: 60
+        target_memory_utilization: 70
+        
+        # Custom metrics for scaling decisions
+        custom_metrics:
+          # Scale based on request rate
+          - type: "Object"
+            metric_name: "requests_per_second"
+            target_value: "50"
+            
+          # Scale based on queue depth
+          - type: "Object"
+            metric_name: "ai_processing_queue_depth"
+            target_value: "10"
+            
+          # Scale based on response time
+          - type: "Object"
+            metric_name: "response_time_p95"
+            target_value: "1000"  # 1 second
+            
+        # Scaling behavior
+        behavior:
+          scale_up:
+            stabilization_window_seconds: 60
+            policies:
+              - type: "Percent"
+                value: 100  # Double the instances
+                period_seconds: 60
+              - type: "Pods"
+                value: 5    # Or add 5 pods max
+                period_seconds: 60
+            select_policy: "Max"
+            
+          scale_down:
+            stabilization_window_seconds: 300  # 5 minutes
+            policies:
+              - type: "Percent"
+                value: 25   # Remove 25% of instances
+                period_seconds: 300
+              - type: "Pods"
+                value: 2    # Or remove 2 pods max
+                period_seconds: 300
+            select_policy: "Min"
+    
+    # Vertical Pod Autoscaler (VPA) configuration
+    vpa:
+      enabled: true
+      update_mode: "Auto"
+      
+      api_service:
+        min_allowed:
+          cpu: "100m"
+          memory: "128Mi"
+        max_allowed:
+          cpu: "2000m"
+          memory: "2Gi"
+        controlled_resources: ["cpu", "memory"]
+        
+    # Cluster Autoscaler configuration
+    cluster_autoscaler:
+      enabled: true
+      scale_down_enabled: true
+      scale_down_delay_after_add: "10m"
+      scale_down_unneeded_time: "10m"
+      scale_down_utilization_threshold: 0.5
+      
+      node_groups:
+        # General purpose nodes
+        - name: "general-purpose"
+          min_size: 3
+          max_size: 10
+          instance_types:
+            - "m5.large"
+            - "m5.xlarge"
+            - "m5.2xlarge"
+          
+        # CPU-optimized nodes for AI processing
+        - name: "cpu-optimized"
+          min_size: 1
+          max_size: 5
+          instance_types:
+            - "c5.xlarge"
+            - "c5.2xlarge"
+            - "c5.4xlarge"
+          taints:
+            - key: "workload"
+              value: "ai-processing"
+              effect: "NoSchedule"
+              
+        # Memory-optimized nodes for caching
+        - name: "memory-optimized"
+          min_size: 1
+          max_size: 3
+          instance_types:
+            - "r5.large"
+            - "r5.xlarge"
+          taints:
+            - key: "workload"
+              value: "cache"
+              effect: "NoSchedule"
+
+  # Database tier scaling
+  database:
+    # PostgreSQL scaling
+    postgresql:
+      # Read replica scaling
+      read_replicas:
+        enabled: true
+        min_replicas: 1
+        max_replicas: 5
+        
+        # Scaling triggers
+        triggers:
+          cpu_threshold: 70
+          connections_threshold: 80
+          read_latency_threshold: "100ms"
+          
+        # Connection pooling
+        connection_pooling:
+          enabled: true
+          pool_size: 20
+          max_overflow: 10
+          
+      # Write scaling (sharding consideration)
+      write_scaling:
+        strategy: "vertical_first"  # Scale up before sharding
+        max_instance_size: "db.r5.8xlarge"
+        sharding:
+          enabled: false  # Future consideration
+          strategy: "hash_based"
+          
+    # Redis scaling
+    redis:
+      # Cluster mode scaling
+      cluster:
+        enabled: true
+        min_shards: 3
+        max_shards: 15
+        nodes_per_shard: 2
+        
+        # Scaling triggers
+        triggers:
+          memory_threshold: 80
+          cpu_threshold: 70
+          connection_threshold: 1000
+          
+      # Sentinel for high availability
+      sentinel:
+        enabled: true
+        instances: 3
+        quorum: 2
+
+  # Load balancing and traffic management
+  load_balancing:
+    # Application Load Balancer
+    alb:
+      # Health check configuration
+      health_check:
+        enabled: true
+        path: "/health"
+        interval: 30
+        timeout: 5
+        healthy_threshold: 2
+        unhealthy_threshold: 3
+        
+      # Sticky sessions
+      sticky_sessions:
+        enabled: false  # Stateless design
+        
+      # Cross-zone load balancing
+      cross_zone: true
+      
+    # Geographic load balancing
+    geographic_lb:
+      enabled: true
+      regions:
+        - name: "us-east-1"
+          weight: 60  # Primary region
+        - name: "us-west-2"
+          weight: 30  # Secondary region
+        - name: "eu-west-1"
+          weight: 10  # Tertiary region
+          
+    # Traffic shaping
+    traffic_shaping:
+      # Blue-green deployments
+      blue_green:
+        enabled: true
+        traffic_split: "10/90"  # 10% new, 90% current
+        ramp_up_duration: "30m"
+        
+      # Canary deployments
+      canary:
+        enabled: true
+        initial_traffic: 5
+        increment: 10
+        interval: "10m"
+        success_criteria:
+          error_rate_threshold: "1%"
+          latency_p95_threshold: "1s"
+
+# Performance optimization
+performance:
+  # Caching strategy
+  caching:
+    # Application-level caching
+    application_cache:
+      # In-memory cache
+      in_memory:
+        enabled: true
+        max_size: "256MB"
+        ttl_default: "5m"
+        
+        # Cache configurations per endpoint
+        endpoints:
+          "/api/user/profile":
+            ttl: "10m"
+            cache_key: "user_id"
+          "/api/bio/templates":
+            ttl: "1h"
+            cache_key: "template_category"
+            
+      # Redis cache
+      redis_cache:
+        enabled: true
+        default_ttl: "1h"
+        
+        # Cache warming
+        cache_warming:
+          enabled: true
+          strategies:
+            - "popular_profiles"
+            - "common_templates"
+            - "frequently_accessed_data"
+            
+    # CDN configuration
+    cdn:
+      provider: "cloudflare"
+      enabled: true
+      
+      # Cache rules
+      cache_rules:
+        static_assets:
+          pattern: "*.{js,css,png,jpg,jpeg,gif,ico,svg,woff,woff2}"
+          ttl: "1y"
+          
+        api_responses:
+          pattern: "/api/public/*"
+          ttl: "5m"
+          
+      # Edge locations
+      edge_locations: "all"
+      
+      # Security features
+      security:
+        ddos_protection: true
+        waf: true
+        bot_management: true
+        
+  # Database optimization
+  database_optimization:
+    # Query optimization
+    query_optimization:
+      # Indexing strategy
+      indexes:
+        user_lookup:
+          table: "users"
+          columns: ["email", "created_at"]
+          type: "btree"
+          
+        photo_analysis:
+          table: "photo_analyses"
+          columns: ["user_id", "created_at"]
+          type: "btree"
+          
+        subscription_lookup:
+          table: "subscriptions"
+          columns: ["user_id", "status", "expires_at"]
+          type: "composite"
+          
+      # Query performance monitoring
+      slow_query_log:
+        enabled: true
+        threshold: "1s"
+        
+      # Connection pooling
+      connection_pooling:
+        pool_size: 20
+        max_overflow: 10
+        pool_timeout: 30
+        pool_recycle: 3600
+        
+    # Database partitioning
+    partitioning:
+      # Time-based partitioning for logs
+      time_based:
+        tables:
+          analytics_events:
+            partition_by: "created_at"
+            interval: "monthly"
+            retention: "12 months"
+            
+      # Hash partitioning for user data (future)
+      hash_based:
+        enabled: false
+        tables: []
+        
+  # API optimization
+  api_optimization:
+    # Response compression
+    compression:
+      enabled: true
+      algorithm: "gzip"
+      level: 6
+      min_size: "1kb"
+      
+    # Request/response optimization
+    request_optimization:
+      # Request size limits
+      max_request_size: "10MB"
+      max_file_size: "50MB"
+      
+      # Response pagination
+      pagination:
+        default_page_size: 20
+        max_page_size: 100
+        
+    # API versioning and deprecation
+    versioning:
+      strategy: "header_based"
+      current_version: "v1"
+      supported_versions: ["v1"]
+      
+  # Resource optimization
+  resource_optimization:
+    # CPU optimization
+    cpu:
+      # Resource requests and limits
+      requests:
+        api: "250m"
+        worker: "500m"
+      limits:
+        api: "1000m"
+        worker: "2000m"
+        
+      # CPU affinity
+      affinity:
+        enabled: true
+        strategy: "spread"
+        
+    # Memory optimization
+    memory:
+      # Resource requests and limits
+      requests:
+        api: "256Mi"
+        worker: "512Mi"
+      limits:
+        api: "1Gi"
+        worker: "2Gi"
+        
+      # Memory management
+      gc_tuning:
+        node_options: "--max-old-space-size=512"
+        
+    # I/O optimization
+    io:
+      # Disk optimization
+      storage_class: "gp3"
+      iops: 3000
+      throughput: "125MB/s"
+      
+      # Network optimization
+      network:
+        bandwidth: "10Gbps"
+        enhanced_networking: true
+
+# Monitoring and observability for scaling
+scaling_monitoring:
+  # Metrics collection
+  metrics:
+    # Application metrics
+    application_metrics:
+      - requests_per_second
+      - response_time_percentiles
+      - error_rate
+      - active_connections
+      - queue_depth
+      
+    # Infrastructure metrics
+    infrastructure_metrics:
+      - cpu_utilization
+      - memory_utilization
+      - disk_utilization
+      - network_utilization
+      - node_count
+      
+    # Business metrics
+    business_metrics:
+      - user_registrations_per_hour
+      - photo_analyses_per_minute
+      - revenue_per_hour
+      - active_subscriptions
+      
+  # Alerting for scaling events
+  alerts:
+    scaling_events:
+      - alert: "HighCPUUsage"
+        threshold: "80%"
+        duration: "5m"
+        
+      - alert: "HighMemoryUsage"
+        threshold: "85%"
+        duration: "5m"
+        
+      - alert: "HighRequestLatency"
+        threshold: "2s"
+        percentile: "95th"
+        duration: "2m"
+        
+      - alert: "ScalingEventFailed"
+        condition: "scaling_failure"
+        severity: "critical"
+
+# Cost optimization
+cost_optimization:
+  # Instance optimization
+  instance_optimization:
+    # Spot instances
+    spot_instances:
+      enabled: true
+      max_percentage: 50
+      instance_types:
+        - "m5.large"
+        - "m5.xlarge"
+        - "c5.large"
+        - "c5.xlarge"
+        
+    # Reserved instances
+    reserved_instances:
+      enabled: true
+      commitment: "1_year"
+      payment_option: "partial_upfront"
+      
+    # Savings plans
+    savings_plans:
+      compute_savings_plans: true
+      commitment: "1_year"
+      hourly_commitment: "$100"
+      
+  # Scheduling optimization
+  scheduling:
+    # Schedule-based scaling
+    scheduled_scaling:
+      business_hours:
+        schedule: "0 8 * * 1-5"  # 8 AM weekdays
+        min_replicas: 5
+        max_replicas: 15
+        
+      off_hours:
+        schedule: "0 18 * * 1-5"  # 6 PM weekdays
+        min_replicas: 3
+        max_replicas: 10
+        
+      weekend:
+        schedule: "0 10 * * 6,0"  # 10 AM weekends
+        min_replicas: 2
+        max_replicas: 8
+        
+    # Resource right-sizing
+    right_sizing:
+      enabled: true
+      analysis_period: "7d"
+      recommendation_threshold: "20%"
+      
+  # Storage optimization
+  storage_optimization:
+    # Lifecycle policies
+    lifecycle_policies:
+      logs:
+        transition_to_ia: "30d"
+        transition_to_glacier: "90d"
+        delete_after: "365d"
+        
+      backups:
+        transition_to_ia: "30d"
+        transition_to_glacier: "90d"
+        delete_after: "2555d"  # 7 years
+        
+    # Storage tiering
+    storage_tiering:
+      hot_data: "gp3"
+      warm_data: "sc1"
+      cold_data: "glacier"
+
+# Testing and validation
+testing:
+  # Load testing
+  load_testing:
+    tools:
+      - "k6"
+      - "artillery"
+      - "jmeter"
+      
+    scenarios:
+      # Normal load
+      normal_load:
+        virtual_users: 100
+        duration: "10m"
+        ramp_up: "2m"
+        
+      # Peak load
+      peak_load:
+        virtual_users: 500
+        duration: "15m"
+        ramp_up: "5m"
+        
+      # Stress test
+      stress_test:
+        virtual_users: 1000
+        duration: "20m"
+        ramp_up: "5m"
+        
+    # Performance targets
+    targets:
+      response_time_p95: "1s"
+      error_rate: "<1%"
+      throughput: ">1000 rps"
+      
+  # Chaos engineering
+  chaos_engineering:
+    enabled: true
+    tools:
+      - "chaos_monkey"
+      - "pumba"
+      - "gremlin"
+      
+    experiments:
+      - "random_pod_termination"
+      - "network_latency_injection"
+      - "cpu_stress_testing"
+      - "memory_exhaustion"
+      
+  # Capacity planning
+  capacity_planning:
+    # Growth projections
+    growth_projections:
+      user_growth_rate: "20%_monthly"
+      request_growth_rate: "25%_monthly"
+      data_growth_rate: "30%_monthly"
+      
+    # Resource planning
+    resource_planning:
+      planning_horizon: "12_months"
+      safety_margin: "25%"
+      review_frequency: "monthly"

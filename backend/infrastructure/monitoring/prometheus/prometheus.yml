@@ -1,0 +1,212 @@
+# Prometheus Configuration for Dating Profile Optimizer
+# Comprehensive monitoring setup for production environment
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+  external_labels:
+    cluster: 'dating-optimizer-production'
+    environment: 'production'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+      timeout: 10s
+      api_version: v2
+
+# Load alerting rules
+rule_files:
+  - "/etc/prometheus/rules/*.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 15s
+    metrics_path: '/metrics'
+
+  # Dating Profile Optimizer API instances
+  - job_name: 'dating-api'
+    static_configs:
+      - targets: 
+        - 'api:3000'
+    scrape_interval: 10s
+    scrape_timeout: 10s
+    metrics_path: '/metrics'
+    honor_labels: true
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'dating-api'
+      - source_labels: [__address__]
+        target_label: service
+        replacement: 'dating-profile-optimizer'
+    metric_relabel_configs:
+      # Drop high-cardinality metrics
+      - source_labels: [__name__]
+        regex: 'nodejs_gc_duration_seconds_bucket|nodejs_eventloop_lag_seconds_bucket'
+        action: drop
+
+  # PostgreSQL Database monitoring
+  - job_name: 'postgres-exporter'
+    static_configs:
+      - targets: 
+        - 'postgres-exporter:9187'
+    scrape_interval: 30s
+    scrape_timeout: 15s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: 'postgresql'
+
+  # Redis monitoring
+  - job_name: 'redis-exporter'
+    static_configs:
+      - targets: 
+        - 'redis-exporter:9121'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: 'redis'
+
+  # Node Exporter for system metrics
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets:
+        - 'node-exporter:9100'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: 'system'
+
+  # Nginx metrics
+  - job_name: 'nginx'
+    static_configs:
+      - targets:
+        - 'nginx-exporter:9113'
+    scrape_interval: 30s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: 'nginx'
+
+  # Elasticsearch monitoring
+  - job_name: 'elasticsearch-exporter'
+    static_configs:
+      - targets:
+        - 'elasticsearch-exporter:9114'
+    scrape_interval: 30s
+    scrape_timeout: 15s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: 'elasticsearch'
+
+  # Docker container metrics (cAdvisor)
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets:
+        - 'cadvisor:8080'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: 'docker'
+
+  # Kubernetes metrics (if using K8s)
+  - job_name: 'kubernetes-apiservers'
+    kubernetes_sd_configs:
+    - role: endpoints
+      namespaces:
+        names:
+        - default
+        - production
+        - staging
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    relabel_configs:
+    - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+      action: keep
+      regex: default;kubernetes;https
+
+  # Business metrics from the application
+  - job_name: 'business-metrics'
+    static_configs:
+      - targets: ['api:3000']
+    metrics_path: '/metrics/business'
+    scrape_interval: 60s
+    scrape_timeout: 30s
+    honor_labels: true
+    metric_relabel_configs:
+      # Keep only business-critical metrics
+      - source_labels: [__name__]
+        regex: '(user_registrations_total|photo_analyses_total|subscriptions_active|revenue_total).*'
+        action: keep
+
+  # External service monitoring (health checks)
+  - job_name: 'blackbox'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+        - https://api.datingoptimizer.com/health
+        - https://api.datingoptimizer.com/api/health
+        - https://openai.com/api
+        - https://api.cloudinary.com/v1_1/health
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # SSL certificate monitoring
+  - job_name: 'ssl-exporter'
+    static_configs:
+      - targets:
+        - 'ssl-exporter:9219'
+    scrape_interval: 300s  # Check every 5 minutes
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: 'ssl-certificates'
+
+# Remote write configuration (for long-term storage)
+remote_write:
+  - url: "https://prometheus.datingoptimizer.com/api/v1/write"
+    queue_config:
+      max_samples_per_send: 1000
+      max_shards: 200
+      capacity: 2500
+    write_relabel_configs:
+      # Keep important metrics for long-term storage
+      - source_labels: [__name__]
+        regex: '(up|http_requests_total|http_request_duration_seconds|user_registrations_total|revenue_total).*'
+        action: keep
+
+# Storage configuration
+storage:
+  tsdb:
+    retention.time: 30d
+    retention.size: 10GB
+    wal-compression: true
+
+# Feature flags
+feature_flags:
+  enable-remote-write-receiver: true
+  enable-exemplar-storage: true

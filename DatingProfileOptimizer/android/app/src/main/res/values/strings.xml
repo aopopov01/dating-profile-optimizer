@@ -1,3 +1,33 @@
 <resources>
     <string name="app_name">DatingProfileOptimizer</string>
+    
+    <!-- Notification channels -->
+    <string name="notification_channel_general">General</string>
+    <string name="notification_channel_onboarding">Onboarding</string>
+    <string name="notification_channel_results">Results</string>
+    <string name="notification_channel_billing">Billing &amp; Subscriptions</string>
+    <string name="notification_channel_promotions">Promotions &amp; Offers</string>
+    <string name="notification_channel_insights">Insights &amp; Performance</string>
+    <string name="notification_channel_security">Security Alerts</string>
+    <string name="notification_channel_engagement">Engagement</string>
+    <string name="notification_channel_tips">Tips &amp; Education</string>
+    
+    <!-- Notification channel descriptions -->
+    <string name="notification_channel_general_description">General app notifications</string>
+    <string name="notification_channel_onboarding_description">Welcome and onboarding messages</string>
+    <string name="notification_channel_results_description">Photo analysis and bio generation results</string>
+    <string name="notification_channel_billing_description">Subscription and billing notifications</string>
+    <string name="notification_channel_promotions_description">Special offers and promotions</string>
+    <string name="notification_channel_insights_description">Profile performance and insights</string>
+    <string name="notification_channel_security_description">Important security notifications</string>
+    <string name="notification_channel_engagement_description">Re-engagement and boost notifications</string>
+    <string name="notification_channel_tips_description">Dating tips and educational content</string>
+    
+    <!-- Default notification actions -->
+    <string name="action_view">View</string>
+    <string name="action_dismiss">Dismiss</string>
+    <string name="action_renew">Renew</string>
+    <string name="action_remind_later">Remind Later</string>
+    <string name="action_review">Review</string>
+    <string name="action_open_app">Open App</string>
 </resources>

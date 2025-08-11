@@ -1,0 +1,451 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Dating Profile Optimizer - API Overview",
+    "tags": ["dating-optimizer", "api", "production"],
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "API Response Time",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{job=\"dating-api\"}[5m]))",
+            "legendFormat": "50th percentile",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"dating-api\"}[5m]))",
+            "legendFormat": "95th percentile",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{job=\"dating-api\"}[5m]))",
+            "legendFormat": "99th percentile",
+            "refId": "C"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Seconds",
+            "min": 0
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        },
+        "alert": {
+          "conditions": [
+            {
+              "query": {
+                "params": ["B", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "for": "2m",
+          "frequency": "30s",
+          "handler": 1,
+          "name": "API Response Time Alert",
+          "noDataState": "no_data",
+          "notifications": []
+        }
+      },
+      {
+        "id": 2,
+        "title": "Request Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{job=\"dating-api\"}[5m])",
+            "legendFormat": "Requests/sec",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Requests/sec",
+            "min": 0
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        }
+      },
+      {
+        "id": 3,
+        "title": "Error Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "(rate(http_requests_total{job=\"dating-api\",code!~\"2..\"}[5m]) / rate(http_requests_total{job=\"dating-api\"}[5m])) * 100",
+            "legendFormat": "Error Rate %",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Percentage",
+            "min": 0,
+            "max": 100
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 8
+        },
+        "alert": {
+          "conditions": [
+            {
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "for": "2m",
+          "frequency": "30s",
+          "handler": 1,
+          "name": "Error Rate Alert",
+          "noDataState": "no_data",
+          "notifications": []
+        }
+      },
+      {
+        "id": 4,
+        "title": "Status Codes",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum by (code) (rate(http_requests_total{job=\"dating-api\"}[5m]))",
+            "legendFormat": "{{code}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 8
+        }
+      },
+      {
+        "id": 5,
+        "title": "Memory Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "nodejs_memory_usage_bytes{job=\"dating-api\",type=\"heapUsed\"} / 1024 / 1024",
+            "legendFormat": "Heap Used (MB)",
+            "refId": "A"
+          },
+          {
+            "expr": "nodejs_memory_usage_bytes{job=\"dating-api\",type=\"heapTotal\"} / 1024 / 1024",
+            "legendFormat": "Heap Total (MB)",
+            "refId": "B"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "MB",
+            "min": 0
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 16
+        }
+      },
+      {
+        "id": 6,
+        "title": "CPU Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(process_cpu_user_seconds_total{job=\"dating-api\"}[5m]) * 100",
+            "legendFormat": "User CPU %",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(process_cpu_system_seconds_total{job=\"dating-api\"}[5m]) * 100",
+            "legendFormat": "System CPU %",
+            "refId": "B"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Percentage",
+            "min": 0
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 16
+        }
+      },
+      {
+        "id": 7,
+        "title": "Database Connections",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "pg_stat_activity_count{job=\"postgres-exporter\"}",
+            "legendFormat": "Active Connections",
+            "refId": "A"
+          },
+          {
+            "expr": "pg_settings_max_connections{job=\"postgres-exporter\"}",
+            "legendFormat": "Max Connections",
+            "refId": "B"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Connections",
+            "min": 0
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 24
+        }
+      },
+      {
+        "id": 8,
+        "title": "Redis Memory Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "redis_memory_used_bytes{job=\"redis-exporter\"} / 1024 / 1024",
+            "legendFormat": "Used Memory (MB)",
+            "refId": "A"
+          },
+          {
+            "expr": "redis_memory_max_bytes{job=\"redis-exporter\"} / 1024 / 1024",
+            "legendFormat": "Max Memory (MB)",
+            "refId": "B"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "MB",
+            "min": 0
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 24
+        }
+      },
+      {
+        "id": 9,
+        "title": "Business Metrics",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(user_registrations_total[1h]) * 3600",
+            "legendFormat": "Registrations/hour",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(photo_analyses_total[1h]) * 3600",
+            "legendFormat": "Photo Analyses/hour",
+            "refId": "B"
+          },
+          {
+            "expr": "subscriptions_active",
+            "legendFormat": "Active Subscriptions",
+            "refId": "C"
+          },
+          {
+            "expr": "rate(revenue_total[24h]) * 86400",
+            "legendFormat": "Daily Revenue",
+            "refId": "D"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 32
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "displayMode": "list",
+              "orientation": "horizontal"
+            },
+            "mappings": [],
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "Top Endpoints by Response Time",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "topk(10, histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"dating-api\"}[5m])))",
+            "legendFormat": "{{method}} {{route}}",
+            "refId": "A",
+            "format": "table"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 40
+        }
+      },
+      {
+        "id": 11,
+        "title": "AI Processing Metrics",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(ai_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "AI Response Time (95th)",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(ai_requests_total[5m])",
+            "legendFormat": "AI Requests/sec",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(ai_errors_total[5m])",
+            "legendFormat": "AI Errors/sec",
+            "refId": "C"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 40
+        }
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "instance",
+          "type": "query",
+          "query": "label_values(up{job=\"dating-api\"}, instance)",
+          "refresh": 1,
+          "multi": false,
+          "includeAll": false
+        },
+        {
+          "name": "time_range",
+          "type": "custom",
+          "options": [
+            {
+              "text": "5m",
+              "value": "5m"
+            },
+            {
+              "text": "15m",
+              "value": "15m"
+            },
+            {
+              "text": "30m",
+              "value": "30m"
+            },
+            {
+              "text": "1h",
+              "value": "1h"
+            },
+            {
+              "text": "6h",
+              "value": "6h"
+            },
+            {
+              "text": "12h",
+              "value": "12h"
+            },
+            {
+              "text": "24h",
+              "value": "24h"
+            }
+          ],
+          "current": {
+            "text": "5m",
+            "value": "5m"
+          }
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "name": "Deployments",
+          "datasource": "Prometheus",
+          "expr": "increase(deployments_total[1m])",
+          "iconColor": "blue",
+          "textFormat": "Deployment: {{version}}"
+        }
+      ]
+    }
+  },
+  "meta": {
+    "type": "db",
+    "canSave": true,
+    "canEdit": true,
+    "canAdmin": true,
+    "canStar": true,
+    "slug": "dating-optimizer-api-overview",
+    "url": "/d/dating-api/dating-optimizer-api-overview",
+    "expires": "0001-01-01T00:00:00Z",
+    "created": "2024-01-01T00:00:00Z",
+    "updated": "2024-01-01T00:00:00Z",
+    "updatedBy": "admin",
+    "createdBy": "admin",
+    "version": 1
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "passed": [
+    {
+      "endpoint": "/health",
+      "method": "GET",
+      "status": "PASS",
+      "message": "Status: 200, Response: {'status': 'healthy', 'timestamp': '2025-08-11T00:32:55.201Z', 'uptime': 7228.342002408, 'environment': 'development', 'version': '1.0.0', 'database': 'connected', 'memory': {'used': 21, 'total': 24, 'external': 2}, 'services': {'stripe': False, 'openai': False, 'cloudinary': True}}",
+      "timestamp": "2025-08-11T03:32:55.202641",
+      "response_data": null
+    }
+  ],
+  "failed": [
+    {
+      "endpoint": "/api/auth/register",
+      "method": "POST",
+      "status": "FAIL",
+      "message": "Status 500: Registration failed",
+      "timestamp": "2025-08-11T03:32:55.418918",
+      "response_data": null
+    },
+    {
+      "endpoint": "/api/auth/login",
+      "method": "POST",
+      "status": "FAIL",
+      "message": "Status 500: Login failed",
+      "timestamp": "2025-08-11T03:32:55.627982",
+      "response_data": null
+    }
+  ],
+  "errors": [
+    {
+      "endpoint": "/api/auth/refresh",
+      "method": "POST",
+      "status": "ERROR",
+      "message": "No refresh token available",
+      "timestamp": "2025-08-11T03:32:55.628039",
+      "response_data": null
+    },
+    {
+      "endpoint": "/api/profile",
+      "method": "GET",
+      "status": "ERROR",
+      "message": "No auth token for testing",
+      "timestamp": "2025-08-11T03:32:55.628044",
+      "response_data": null
+    }
+  ]
+}

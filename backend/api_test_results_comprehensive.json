@@ -1,0 +1,40 @@
+{
+  "passed": [
+    {
+      "endpoint": "/health",
+      "method": "GET",
+      "status": "PASS",
+      "message": "Server healthy - healthy",
+      "timestamp": "2025-08-11T03:34:16.197986",
+      "response_data": null
+    }
+  ],
+  "failed": [
+    {
+      "endpoint": "/api/auth/register",
+      "method": "POST",
+      "status": "FAIL",
+      "message": "Status 500: Registration failed",
+      "timestamp": "2025-08-11T03:34:16.400920",
+      "response_data": null
+    },
+    {
+      "endpoint": "/api/auth/login",
+      "method": "POST",
+      "status": "FAIL",
+      "message": "Status 500: Login failed",
+      "timestamp": "2025-08-11T03:34:16.604893",
+      "response_data": null
+    }
+  ],
+  "errors": [
+    {
+      "endpoint": "/api/auth/refresh",
+      "method": "POST",
+      "status": "ERROR",
+      "message": "No refresh token available",
+      "timestamp": "2025-08-11T03:34:16.604929",
+      "response_data": null
+    }
+  ]
+}

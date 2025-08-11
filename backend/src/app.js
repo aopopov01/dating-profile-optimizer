@@ -3,6 +3,8 @@ const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
+const morgan = require('morgan');
+const path = require('path');
 const { createServer } = require('http');
 require('dotenv').config();
 
@@ -10,22 +12,27 @@ require('dotenv').config();
 const logger = require('./config/logger');
 const db = require('./config/database');
 
-// Import middleware
-const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
-const authMiddleware = require('./middleware/auth');
-const securityMiddleware = require('./middleware/security');
-
 // Import routes
-const healthRoutes = require('./routes/health');
 const authRoutes = require('./routes/auth');
-const profileRoutes = require('./routes/profiles');
-const photoRoutes = require('./routes/photos');
-const bioRoutes = require('./routes/bios');
+const profileRoutes = require('./routes/profile');
+const bioRoutes = require('./routes/bio');
+const photoAnalysisRoutes = require('./routes/photoAnalysis');
+const paymentsRoutes = require('./routes/payments');
+const pushNotificationRoutes = require('./routes/pushNotifications');
+const securityRoutes = require('./routes/security');
+const securityDashboardRoutes = require('./routes/securityDashboard');
 const analyticsRoutes = require('./routes/analytics');
-const paymentRoutes = require('./routes/payments');
+const analyticsEnhancedRoutes = require('./routes/analyticsEnhanced');
+const contentModerationRoutes = require('./routes/contentModeration');
+const moderationDashboardRoutes = require('./routes/moderationDashboard');
+const authMiddleware = require('./middleware/auth');
 
-// Import services
-const { initializeServices } = require('./services');
+// Import analytics services
+const errorTrackingService = require('./services/errorTrackingService');
+const performanceMonitoringService = require('./services/performanceMonitoringService');
+const analyticsDashboardService = require('./services/analyticsDashboardService');
+const userBehaviorAnalyticsService = require('./services/userBehaviorAnalyticsService');
+const analyticsAlertingService = require('./services/analyticsAlertingService');
 
 const app = express();
 const server = createServer(app);
@@ -68,6 +75,9 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Performance monitoring middleware
+app.use(performanceMonitoringService.getHTTPMonitoringMiddleware());
+
 // Trust proxy for accurate IP addresses
 app.set('trust proxy', true);
 
@@ -85,13 +95,18 @@ app.use((req, res, next) => {
 const API_VERSION = '/api/v1';
 
 // Routes
-app.use('/health', healthRoutes);
-app.use(`${API_VERSION}/auth`, authRoutes);
-app.use(`${API_VERSION}/profiles`, authMiddleware.authenticate, profileRoutes);
-app.use(`${API_VERSION}/photos`, authMiddleware.authenticate, photoRoutes);
-app.use(`${API_VERSION}/bios`, authMiddleware.authenticate, bioRoutes);
-app.use(`${API_VERSION}/analytics`, authMiddleware.authenticate, analyticsRoutes);
-app.use(`${API_VERSION}/payments`, authMiddleware.authenticate, paymentRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/profile', profileRoutes);
+app.use('/api/bio', bioRoutes);
+app.use('/api/photo-analysis', photoAnalysisRoutes);
+app.use('/api/payments', paymentsRoutes);
+app.use('/api/push-notifications', pushNotificationRoutes);
+app.use('/api/security', securityRoutes);
+app.use('/api/security/dashboard', securityDashboardRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/analytics/enhanced', analyticsEnhancedRoutes);
+app.use('/api/content-moderation', contentModerationRoutes);
+app.use('/api/moderation-dashboard', moderationDashboardRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -112,9 +127,81 @@ app.get('/', (req, res) => {
   });
 });
 
-// Error handling
-app.use(notFoundHandler);
-app.use(errorHandler);
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    error: 'Not Found',
+    message: `Route ${req.method} ${req.path} not found`,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Error tracking middleware
+app.use(errorTrackingService.getMiddleware());
+
+// Error handler
+app.use((err, req, res, next) => {
+  logger.error('Error:', {
+    error: err.message,
+    stack: err.stack,
+    method: req.method,
+    path: req.path,
+    ip: req.ip
+  });
+
+  res.status(err.status || 500).json({
+    success: false,
+    error: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message,
+    ...(process.env.NODE_ENV !== 'production' && { stack: err.stack }),
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Initialize services
+async function initializeServices() {
+  try {
+    // Initialize Firebase and notification services
+    const firebaseConfig = require('./config/firebase');
+    await firebaseConfig.initialize();
+    
+    // Initialize notification scheduler
+    const notificationSchedulerService = require('./services/notificationSchedulerService');
+    await notificationSchedulerService.initialize();
+    
+    // Initialize analytics services
+    logger.info('Initializing analytics services...');
+    await errorTrackingService.init();
+    await performanceMonitoringService.init();
+    await analyticsDashboardService.init();
+    await userBehaviorAnalyticsService.init();
+    await analyticsAlertingService.init();
+    
+    logger.info('All analytics services initialized successfully');
+    
+    // Initialize notification templates
+    const notificationTemplateService = require('./services/notificationTemplateService');
+    await notificationTemplateService.initializeDefaultTemplates();
+    
+    // Initialize security monitoring service
+    const securityMonitoringService = require('./services/securityMonitoringService');
+    logger.info('Security monitoring service initialized');
+    
+    // Initialize data protection service
+    const dataProtectionService = require('./services/dataProtectionService');
+    logger.info('Data protection service initialized');
+    
+    // Initialize moderation scheduler service
+    const moderationSchedulerService = require('./services/moderationSchedulerService');
+    await moderationSchedulerService.initialize();
+    logger.info('Moderation scheduler service initialized');
+    
+    logger.info('All services initialized successfully');
+  } catch (error) {
+    logger.error('Failed to initialize services:', error);
+    throw error;
+  }
+}
 
 // Initialize services and start server
 const PORT = process.env.PORT || 3002;

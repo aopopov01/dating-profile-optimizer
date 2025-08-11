@@ -1,0 +1,317 @@
+# Prometheus Alerting Rules for Dating Profile Optimizer
+# Comprehensive alerting for production monitoring
+
+groups:
+  # Application-level alerts
+  - name: dating-optimizer-application
+    interval: 30s
+    rules:
+      - alert: HighErrorRate
+        expr: (rate(http_requests_total{code!~"2.."}[5m]) / rate(http_requests_total[5m])) * 100 > 5
+        for: 2m
+        labels:
+          severity: critical
+          service: dating-api
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value }}% for the last 5 minutes"
+          runbook_url: "https://docs.datingoptimizer.com/runbooks/high-error-rate"
+
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 3m
+        labels:
+          severity: warning
+          service: dating-api
+        annotations:
+          summary: "High response time detected"
+          description: "95th percentile response time is {{ $value }}s"
+          runbook_url: "https://docs.datingoptimizer.com/runbooks/high-response-time"
+
+      - alert: APIEndpointDown
+        expr: up{job="dating-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: dating-api
+        annotations:
+          summary: "API endpoint is down"
+          description: "Dating Profile Optimizer API is not responding"
+          runbook_url: "https://docs.datingoptimizer.com/runbooks/api-down"
+
+      - alert: LowRequestVolume
+        expr: rate(http_requests_total[5m]) < 0.1
+        for: 10m
+        labels:
+          severity: warning
+          service: dating-api
+        annotations:
+          summary: "Unusually low request volume"
+          description: "Request rate is {{ $value }} requests/second"
+          runbook_url: "https://docs.datingoptimizer.com/runbooks/low-traffic"
+
+      - alert: HighMemoryUsage
+        expr: (nodejs_memory_usage_bytes{job="dating-api"} / nodejs_memory_limit_bytes) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: dating-api
+        annotations:
+          summary: "High memory usage in Node.js application"
+          description: "Memory usage is {{ $value }}%"
+
+      - alert: OpenAIAPIFailures
+        expr: rate(openai_api_requests_total{status!~"2.."}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          service: openai-integration
+        annotations:
+          summary: "OpenAI API failures detected"
+          description: "OpenAI API failure rate: {{ $value }} failures/second"
+
+  # Database monitoring
+  - name: postgresql-database
+    interval: 30s
+    rules:
+      - alert: PostgreSQLDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: postgresql
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL database is not responding"
+          runbook_url: "https://docs.datingoptimizer.com/runbooks/postgres-down"
+
+      - alert: HighDatabaseConnections
+        expr: (pg_stat_activity_count / pg_settings_max_connections) * 100 > 80
+        for: 2m
+        labels:
+          severity: warning
+          service: postgresql
+        annotations:
+          summary: "High database connection usage"
+          description: "Database connections at {{ $value }}% of limit"
+
+      - alert: LongRunningQueries
+        expr: pg_stat_activity_max_tx_duration > 300
+        for: 1m
+        labels:
+          severity: warning
+          service: postgresql
+        annotations:
+          summary: "Long-running database queries detected"
+          description: "Query running for {{ $value }} seconds"
+
+      - alert: DatabaseDiskSpaceLow
+        expr: (node_filesystem_avail_bytes{mountpoint="/var/lib/postgresql/data"} / node_filesystem_size_bytes{mountpoint="/var/lib/postgresql/data"}) * 100 < 20
+        for: 5m
+        labels:
+          severity: critical
+          service: postgresql
+        annotations:
+          summary: "Database disk space low"
+          description: "Only {{ $value }}% disk space remaining"
+
+      - alert: ReplicationLag
+        expr: pg_replication_lag > 10
+        for: 2m
+        labels:
+          severity: warning
+          service: postgresql
+        annotations:
+          summary: "High PostgreSQL replication lag"
+          description: "Replication lag is {{ $value }} seconds"
+
+  # Redis monitoring
+  - name: redis-cache
+    interval: 30s
+    rules:
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: redis
+        annotations:
+          summary: "Redis is down"
+          description: "Redis cache server is not responding"
+          runbook_url: "https://docs.datingoptimizer.com/runbooks/redis-down"
+
+      - alert: HighRedisMemoryUsage
+        expr: (redis_memory_used_bytes / redis_memory_max_bytes) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "High Redis memory usage"
+          description: "Redis memory usage is {{ $value }}%"
+
+      - alert: RedisSlowLog
+        expr: increase(redis_slowlog_length[1m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "Redis slow queries detected"
+          description: "{{ $value }} slow queries in the last minute"
+
+  # System-level monitoring
+  - name: system-resources
+    interval: 30s
+    rules:
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}%"
+
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value }}%"
+
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100 < 10
+        for: 5m
+        labels:
+          severity: critical
+          service: system
+        annotations:
+          summary: "Low disk space"
+          description: "Only {{ $value }}% disk space remaining on {{ $labels.mountpoint }}"
+
+      - alert: HighIOWait
+        expr: rate(node_cpu_seconds_total{mode="iowait"}[5m]) * 100 > 30
+        for: 3m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High I/O wait time"
+          description: "I/O wait time is {{ $value }}%"
+
+  # Infrastructure monitoring
+  - name: infrastructure
+    interval: 60s
+    rules:
+      - alert: NginxDown
+        expr: nginx_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: nginx
+        annotations:
+          summary: "Nginx is down"
+          description: "Nginx reverse proxy is not responding"
+
+      - alert: SSLCertificateExpiring
+        expr: ssl_certificate_expiry_seconds < 7 * 24 * 60 * 60
+        for: 1h
+        labels:
+          severity: warning
+          service: ssl
+        annotations:
+          summary: "SSL certificate expiring soon"
+          description: "SSL certificate expires in {{ $value | humanizeDuration }}"
+
+      - alert: ElasticsearchClusterRed
+        expr: elasticsearch_cluster_health_status{color="red"} == 1
+        for: 2m
+        labels:
+          severity: critical
+          service: elasticsearch
+        annotations:
+          summary: "Elasticsearch cluster is red"
+          description: "Elasticsearch cluster health is red"
+
+  # Business metrics alerts
+  - name: business-metrics
+    interval: 300s  # Check every 5 minutes
+    rules:
+      - alert: LowUserRegistrations
+        expr: rate(user_registrations_total[1h]) < 0.001  # Less than ~3.6 registrations/hour
+        for: 30m
+        labels:
+          severity: warning
+          service: business
+        annotations:
+          summary: "Low user registration rate"
+          description: "Only {{ $value }} registrations per second in the last hour"
+
+      - alert: PaymentProcessingFailures
+        expr: rate(payment_failures_total[5m]) > 0.01
+        for: 2m
+        labels:
+          severity: critical
+          service: payments
+        annotations:
+          summary: "High payment processing failures"
+          description: "Payment failure rate: {{ $value }} failures/second"
+
+      - alert: AIServiceDegradation
+        expr: histogram_quantile(0.95, rate(ai_request_duration_seconds_bucket[10m])) > 30
+        for: 5m
+        labels:
+          severity: warning
+          service: ai-processing
+        annotations:
+          summary: "AI service performance degradation"
+          description: "95th percentile AI response time is {{ $value }}s"
+
+      - alert: UnusualTrafficPattern
+        expr: abs(rate(http_requests_total[5m]) - rate(http_requests_total[5m] offset 24h)) > 2 * stddev_over_time(rate(http_requests_total[5m])[7d:5m])
+        for: 10m
+        labels:
+          severity: info
+          service: traffic-analysis
+        annotations:
+          summary: "Unusual traffic pattern detected"
+          description: "Current traffic significantly differs from same time yesterday"
+
+  # Security alerts
+  - name: security
+    interval: 30s
+    rules:
+      - alert: HighFailedLoginAttempts
+        expr: rate(failed_login_attempts_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          service: security
+        annotations:
+          summary: "High number of failed login attempts"
+          description: "{{ $value }} failed login attempts per second"
+
+      - alert: RateLimitHit
+        expr: rate(rate_limit_exceeded_total[5m]) > 0.5
+        for: 1m
+        labels:
+          severity: warning
+          service: security
+        annotations:
+          summary: "Rate limits are being exceeded"
+          description: "{{ $value }} rate limit violations per second"
+
+      - alert: UnauthorizedAPIAccess
+        expr: rate(http_requests_total{code="401"}[5m]) > 0.2
+        for: 3m
+        labels:
+          severity: warning
+          service: security
+        annotations:
+          summary: "High number of unauthorized API access attempts"
+          description: "{{ $value }} 401 responses per second"

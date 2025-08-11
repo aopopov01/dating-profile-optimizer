@@ -1,0 +1,370 @@
+# SSL Certificate Automation for Dating Profile Optimizer
+# Let's Encrypt integration with automatic renewal and multi-domain support
+
+ssl_automation:
+  # Certificate provider configuration
+  provider:
+    name: "letsencrypt"
+    environment: "production"  # or "staging" for testing
+    email: "ssl@datingoptimizer.com"
+    
+  # Domains to secure
+  domains:
+    primary:
+      - "api.datingoptimizer.com"
+      - "www.api.datingoptimizer.com"
+    monitoring:
+      - "monitoring.datingoptimizer.com"
+      - "grafana.datingoptimizer.com"
+      - "prometheus.datingoptimizer.com"
+    admin:
+      - "admin.datingoptimizer.com"
+      - "kibana.datingoptimizer.com"
+    
+  # Certificate management
+  certificates:
+    # Primary API certificate
+    - name: "api-datingoptimizer"
+      domains:
+        - "api.datingoptimizer.com"
+        - "www.api.datingoptimizer.com"
+      challenge: "http-01"
+      key_type: "RSA2048"
+      renewal_days: 30
+      post_renewal_hook: "/scripts/reload-nginx.sh"
+      
+    # Monitoring services certificate
+    - name: "monitoring-datingoptimizer"
+      domains:
+        - "monitoring.datingoptimizer.com"
+        - "grafana.datingoptimizer.com"
+        - "prometheus.datingoptimizer.com"
+      challenge: "dns-01"
+      key_type: "ECDSA256"
+      renewal_days: 30
+      post_renewal_hook: "/scripts/reload-monitoring.sh"
+      
+    # Admin services certificate
+    - name: "admin-datingoptimizer"
+      domains:
+        - "admin.datingoptimizer.com"
+        - "kibana.datingoptimizer.com"
+      challenge: "dns-01"
+      key_type: "RSA2048"
+      renewal_days: 30
+      post_renewal_hook: "/scripts/reload-admin.sh"
+
+# Certbot configuration
+certbot:
+  # Installation method
+  installation: "docker"
+  image: "certbot/certbot:latest"
+  
+  # Storage locations
+  config_dir: "/etc/letsencrypt"
+  work_dir: "/var/lib/letsencrypt"
+  logs_dir: "/var/log/letsencrypt"
+  
+  # Renewal configuration
+  renewal:
+    check_interval: "12h"
+    retry_attempts: 3
+    retry_delay: "1h"
+    
+  # DNS challenge configuration (for wildcard certificates)
+  dns_plugins:
+    - name: "route53"
+      config: "/etc/certbot/route53.ini"
+      credentials: "/etc/certbot/route53-credentials.ini"
+    - name: "cloudflare"
+      config: "/etc/certbot/cloudflare.ini"
+      credentials: "/etc/certbot/cloudflare-credentials.ini"
+
+# Certificate deployment
+deployment:
+  # Nginx configuration
+  nginx:
+    config_path: "/etc/nginx/ssl"
+    reload_command: "nginx -s reload"
+    test_command: "nginx -t"
+    
+  # Load balancer configuration
+  load_balancer:
+    type: "aws_alb"
+    certificate_manager: true
+    auto_upload: true
+    
+  # Kubernetes secrets (if using K8s)
+  kubernetes:
+    namespace: "production"
+    secret_name: "tls-certificates"
+    auto_update: true
+
+# Monitoring and alerting
+monitoring:
+  # Certificate expiry monitoring
+  expiry_alerts:
+    warning_days: 30
+    critical_days: 7
+    
+  # Certificate validation checks
+  validation_checks:
+    - ssl_labs_grade: "A+"
+    - certificate_transparency: true
+    - ocsp_stapling: true
+    - hsts_enabled: true
+    
+  # Notification channels
+  notifications:
+    slack:
+      webhook: "${SLACK_SSL_WEBHOOK}"
+      channel: "#ssl-certificates"
+    email:
+      recipients:
+        - "devops@datingoptimizer.com"
+        - "security@datingoptimizer.com"
+    pagerduty:
+      service_key: "${PAGERDUTY_SSL_KEY}"
+
+# Security policies
+security:
+  # SSL/TLS configuration
+  tls:
+    min_version: "1.2"
+    preferred_version: "1.3"
+    ciphers:
+      - "TLS_AES_256_GCM_SHA384"
+      - "TLS_CHACHA20_POLY1305_SHA256"
+      - "TLS_AES_128_GCM_SHA256"
+      - "ECDHE-RSA-AES256-GCM-SHA384"
+      - "ECDHE-RSA-CHACHA20-POLY1305"
+      - "ECDHE-RSA-AES128-GCM-SHA256"
+    
+  # HSTS configuration
+  hsts:
+    enabled: true
+    max_age: 31536000  # 1 year
+    include_subdomains: true
+    preload: true
+    
+  # Certificate pinning
+  hpkp:
+    enabled: false  # Deprecated, using Certificate Transparency instead
+    
+  # OCSP stapling
+  ocsp_stapling:
+    enabled: true
+    cache_timeout: 3600
+    
+  # Certificate transparency
+  certificate_transparency:
+    enabled: true
+    log_monitoring: true
+
+# Automation scripts
+automation:
+  # Certificate provisioning
+  provision_script: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    DOMAIN="$1"
+    CHALLENGE="${2:-http-01}"
+    
+    echo "Provisioning certificate for $DOMAIN using $CHALLENGE challenge"
+    
+    if [[ "$CHALLENGE" == "http-01" ]]; then
+        certbot certonly \
+            --webroot \
+            --webroot-path=/var/www/certbot \
+            --email ssl@datingoptimizer.com \
+            --agree-tos \
+            --no-eff-email \
+            --domains "$DOMAIN"
+    elif [[ "$CHALLENGE" == "dns-01" ]]; then
+        certbot certonly \
+            --dns-route53 \
+            --dns-route53-credentials /etc/certbot/route53-credentials.ini \
+            --email ssl@datingoptimizer.com \
+            --agree-tos \
+            --no-eff-email \
+            --domains "$DOMAIN"
+    fi
+    
+    echo "Certificate provisioned successfully for $DOMAIN"
+  
+  # Certificate renewal
+  renewal_script: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    echo "Starting certificate renewal check"
+    
+    # Run renewal
+    certbot renew \
+        --quiet \
+        --no-self-upgrade \
+        --post-hook "/scripts/post-renewal.sh"
+    
+    # Check renewal status
+    if [[ $? -eq 0 ]]; then
+        echo "Certificate renewal completed successfully"
+        # Send success notification
+        curl -X POST "${SLACK_SSL_WEBHOOK}" \
+            -H 'Content-type: application/json' \
+            --data '{"text":"✅ SSL certificates renewed successfully"}'
+    else
+        echo "Certificate renewal failed"
+        # Send failure notification
+        curl -X POST "${SLACK_SSL_WEBHOOK}" \
+            -H 'Content-type: application/json' \
+            --data '{"text":"❌ SSL certificate renewal failed - immediate attention required"}'
+        exit 1
+    fi
+  
+  # Post-renewal hooks
+  post_renewal_script: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    echo "Running post-renewal tasks"
+    
+    # Reload Nginx
+    if nginx -t; then
+        nginx -s reload
+        echo "Nginx reloaded successfully"
+    else
+        echo "Nginx configuration test failed"
+        exit 1
+    fi
+    
+    # Update Kubernetes secrets if in K8s environment
+    if command -v kubectl >/dev/null 2>&1; then
+        kubectl delete secret tls-certificates -n production || true
+        kubectl create secret tls tls-certificates \
+            --cert=/etc/letsencrypt/live/api.datingoptimizer.com/fullchain.pem \
+            --key=/etc/letsencrypt/live/api.datingoptimizer.com/privkey.pem \
+            -n production
+        echo "Kubernetes TLS secret updated"
+    fi
+    
+    # Upload to AWS Certificate Manager
+    if command -v aws >/dev/null 2>&1; then
+        aws acm import-certificate \
+            --certificate fileb:///etc/letsencrypt/live/api.datingoptimizer.com/cert.pem \
+            --private-key fileb:///etc/letsencrypt/live/api.datingoptimizer.com/privkey.pem \
+            --certificate-chain fileb:///etc/letsencrypt/live/api.datingoptimizer.com/chain.pem \
+            --region us-east-1
+        echo "Certificate uploaded to AWS ACM"
+    fi
+    
+    echo "Post-renewal tasks completed"
+
+# Docker configuration for certbot
+docker_config:
+  certbot_service:
+    image: "certbot/certbot:latest"
+    volumes:
+      - "./ssl/certbot:/etc/letsencrypt"
+      - "./ssl/www:/var/www/certbot"
+      - "./ssl/logs:/var/log/letsencrypt"
+    environment:
+      - "AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}"
+      - "AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}"
+      - "AWS_DEFAULT_REGION=us-east-1"
+    command: >
+      sh -c "trap exit TERM;
+             while :; do
+               certbot renew --quiet --no-self-upgrade --post-hook '/scripts/post-renewal.sh';
+               sleep 12h & wait $${!};
+             done;"
+    restart: unless-stopped
+
+# Cron jobs for automation
+cron_jobs:
+  # Certificate renewal check (twice daily)
+  - name: "ssl_renewal_check"
+    schedule: "0 */12 * * *"
+    command: "/scripts/ssl-renewal.sh"
+    user: "root"
+    
+  # Certificate expiry monitoring (daily)
+  - name: "ssl_expiry_check"
+    schedule: "0 6 * * *"
+    command: "/scripts/ssl-expiry-check.sh"
+    user: "ssl-monitor"
+    
+  # SSL configuration validation (weekly)
+  - name: "ssl_config_validation"
+    schedule: "0 3 * * 1"
+    command: "/scripts/ssl-config-test.sh"
+    user: "ssl-monitor"
+
+# Testing and validation
+testing:
+  # SSL Labs integration
+  ssl_labs:
+    enabled: true
+    api_endpoint: "https://api.ssllabs.com/api/v3/"
+    minimum_grade: "A"
+    check_frequency: "weekly"
+    
+  # Internal validation
+  internal_checks:
+    - certificate_validity
+    - certificate_chain
+    - ocsp_response
+    - certificate_transparency_logs
+    - ssl_configuration
+    
+  # External monitoring
+  external_monitoring:
+    - service: "uptimerobot"
+      check_ssl: true
+    - service: "pingdom"
+      check_ssl: true
+    - service: "ssl_labs"
+      periodic_scan: true
+
+# Backup and recovery
+backup:
+  # Certificate backup
+  certificate_backup:
+    enabled: true
+    schedule: "0 4 * * *"
+    destinations:
+      - "s3://dating-optimizer-ssl-backups/"
+      - "gs://dating-optimizer-ssl-backups/"
+    encryption: true
+    retention: "90 days"
+    
+  # Private key security
+  private_key_security:
+    permissions: "600"
+    owner: "ssl-cert"
+    group: "ssl-cert"
+    encrypted_storage: true
+    hsm_integration: false  # Future consideration
+
+# Compliance and audit
+compliance:
+  # Audit logging
+  audit_logs:
+    enabled: true
+    log_location: "/var/log/ssl-audit.log"
+    retention: "2 years"
+    
+  # Certificate transparency monitoring
+  ct_monitoring:
+    enabled: true
+    services:
+      - "crt.sh"
+      - "certificate-transparency.org"
+    alert_on_unexpected: true
+    
+  # Regular compliance checks
+  compliance_checks:
+    pci_dss: true
+    sox_compliance: true
+    gdpr_compliance: true
+    hipaa_compliance: false

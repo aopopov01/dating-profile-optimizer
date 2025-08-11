@@ -1,0 +1,219 @@
+# Deployment Configuration for Dating Profile Optimizer
+# Environment-specific configurations for staging and production
+
+environments:
+  staging:
+    domain: "api-staging.datingoptimizer.com"
+    replicas: 2
+    resources:
+      requests:
+        cpu: "250m"
+        memory: "256Mi"
+      limits:
+        cpu: "500m"
+        memory: "512Mi"
+    auto_scaling:
+      enabled: true
+      min_replicas: 2
+      max_replicas: 5
+      target_cpu_utilization: 70
+      target_memory_utilization: 80
+    
+    database:
+      instance_type: "db.t3.small"
+      storage: "50GB"
+      backup_retention: "7 days"
+      multi_az: false
+    
+    redis:
+      instance_type: "cache.t3.micro"
+      num_cache_nodes: 1
+    
+    monitoring:
+      enabled: true
+      retention: "14 days"
+      alerts:
+        response_time: "2s"
+        error_rate: "5%"
+        cpu_threshold: "80%"
+        memory_threshold: "85%"
+
+  production:
+    domain: "api.datingoptimizer.com"
+    replicas: 3
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "512Mi"
+      limits:
+        cpu: "1000m"
+        memory: "1Gi"
+    auto_scaling:
+      enabled: true
+      min_replicas: 3
+      max_replicas: 10
+      target_cpu_utilization: 60
+      target_memory_utilization: 70
+      scale_up_cooldown: "3m"
+      scale_down_cooldown: "5m"
+    
+    database:
+      instance_type: "db.r5.large"
+      storage: "200GB"
+      backup_retention: "30 days"
+      multi_az: true
+      read_replicas: 2
+      performance_insights: true
+    
+    redis:
+      instance_type: "cache.r5.large"
+      num_cache_nodes: 3
+      cluster_mode: true
+      
+    monitoring:
+      enabled: true
+      retention: "90 days"
+      alerts:
+        response_time: "1s"
+        error_rate: "2%"
+        cpu_threshold: "70%"
+        memory_threshold: "80%"
+
+# Feature flags for gradual rollouts
+feature_flags:
+  new_ai_model:
+    enabled_staging: true
+    enabled_production: false
+    rollout_percentage: 0
+  
+  enhanced_photo_analysis:
+    enabled_staging: true
+    enabled_production: true
+    rollout_percentage: 100
+  
+  linkedin_integration:
+    enabled_staging: true
+    enabled_production: false
+    rollout_percentage: 0
+
+# Deployment strategies
+deployment_strategies:
+  staging:
+    strategy: "rolling_update"
+    max_surge: 1
+    max_unavailable: 0
+  
+  production:
+    strategy: "blue_green"
+    health_check_grace_period: "90s"
+    traffic_shift_duration: "5m"
+    auto_rollback_threshold:
+      error_rate: "5%"
+      response_time: "2s"
+
+# Security configurations
+security:
+  ssl_certificates:
+    provider: "letsencrypt"
+    auto_renewal: true
+  
+  secrets_management:
+    provider: "kubernetes_secrets"  # or "aws_secrets_manager", "vault"
+    rotation_enabled: true
+    rotation_interval: "90d"
+  
+  network_policies:
+    enabled: true
+    ingress_whitelist:
+      - "0.0.0.0/0"  # API endpoints (with rate limiting)
+    egress_whitelist:
+      - "openai.com"
+      - "cloudinary.com"
+      - "stripe.com"
+      - "*.amazonaws.com"
+
+# Backup configurations
+backup:
+  database:
+    frequency: "daily"
+    retention:
+      staging: "7 days"
+      production: "30 days"
+    encryption: true
+    cross_region_replication: true
+  
+  file_storage:
+    frequency: "daily"
+    retention:
+      staging: "14 days"
+      production: "90 days"
+    versioning: true
+
+# Monitoring and alerting
+monitoring:
+  metrics:
+    - name: "response_time_p95"
+      threshold: "1s"
+      severity: "warning"
+    - name: "error_rate"
+      threshold: "2%"
+      severity: "critical"
+    - name: "database_connections"
+      threshold: "80%"
+      severity: "warning"
+    - name: "memory_usage"
+      threshold: "85%"
+      severity: "critical"
+    - name: "disk_usage"
+      threshold: "90%"
+      severity: "critical"
+  
+  health_checks:
+    - path: "/health"
+      interval: "30s"
+      timeout: "10s"
+      healthy_threshold: 2
+      unhealthy_threshold: 3
+    - path: "/health/detailed"
+      interval: "60s"
+      timeout: "30s"
+      healthy_threshold: 2
+      unhealthy_threshold: 5
+
+# Performance optimization
+performance:
+  caching:
+    redis:
+      ttl_default: "1h"
+      ttl_user_data: "15m"
+      ttl_ai_results: "24h"
+    
+    cdn:
+      enabled: true
+      provider: "cloudflare"
+      cache_headers: true
+  
+  database:
+    connection_pooling:
+      max_connections: 20
+      idle_timeout: "30s"
+    query_timeout: "30s"
+    slow_query_log: true
+
+# Cost optimization
+cost_optimization:
+  auto_scaling:
+    scale_down_delay: "5m"
+    scale_down_threshold: "30%"
+  
+  spot_instances:
+    enabled: false  # For non-critical workloads only
+    percentage: 30
+  
+  scheduled_scaling:
+    - schedule: "0 8 * * 1-5"  # Scale up on weekday mornings
+      replicas: 5
+    - schedule: "0 18 * * 1-5" # Scale down on weekday evenings
+      replicas: 3
+    - schedule: "0 10 * * 6,0" # Weekend scaling
+      replicas: 2

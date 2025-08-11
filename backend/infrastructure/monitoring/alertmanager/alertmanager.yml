@@ -1,0 +1,314 @@
+# AlertManager Configuration for Dating Profile Optimizer
+# Production-ready alerting with multiple notification channels
+
+global:
+  smtp_smarthost: 'localhost:587'
+  smtp_from: 'alerts@datingoptimizer.com'
+  smtp_auth_username: 'alerts@datingoptimizer.com'
+  smtp_auth_password: '${SMTP_PASSWORD}'
+  smtp_require_tls: true
+  
+  # Slack webhook URL
+  slack_api_url: '${SLACK_WEBHOOK_URL}'
+  
+  # PagerDuty integration key
+  pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
+  
+  # External URL for AlertManager
+  external_url: 'https://alerts.datingoptimizer.com'
+
+# Templates for notifications
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Route configuration
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 2h
+  receiver: 'web.hook'
+  
+  routes:
+    # Critical alerts go to PagerDuty and Slack immediately
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 10s
+      repeat_interval: 30m
+      routes:
+        # Database issues need immediate attention
+        - match:
+            service: postgresql
+          receiver: 'database-critical'
+          group_wait: 5s
+          repeat_interval: 15m
+        
+        # API down alerts
+        - match:
+            alertname: APIEndpointDown
+          receiver: 'api-down'
+          group_wait: 5s
+          repeat_interval: 10m
+    
+    # Warning alerts go to Slack and email
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+      group_wait: 60s
+      repeat_interval: 4h
+    
+    # Business metric alerts
+    - match:
+        service: business
+      receiver: 'business-alerts'
+      group_wait: 300s  # 5 minutes
+      repeat_interval: 8h
+    
+    # Security alerts need special handling
+    - match:
+        service: security
+      receiver: 'security-alerts'
+      group_wait: 30s
+      repeat_interval: 1h
+    
+    # Infrastructure alerts
+    - match:
+        service: system
+      receiver: 'infrastructure-alerts'
+      group_wait: 120s
+      repeat_interval: 6h
+
+# Notification receivers
+receivers:
+  # Default webhook receiver
+  - name: 'web.hook'
+    webhook_configs:
+    - url: 'http://127.0.0.1:5001/'
+      send_resolved: true
+
+  # Critical alerts - PagerDuty + Slack + Email
+  - name: 'critical-alerts'
+    pagerduty_configs:
+    - service_key: '${PAGERDUTY_SERVICE_KEY}'
+      description: 'CRITICAL: {{ .GroupLabels.alertname }} - {{ .CommonAnnotations.summary }}'
+      details: |
+        {{ range .Alerts }}
+        Alert: {{ .Annotations.summary }}
+        Description: {{ .Annotations.description }}
+        Service: {{ .Labels.service }}
+        Instance: {{ .Labels.instance }}
+        {{ end }}
+      client: 'Dating Profile Optimizer Monitoring'
+      client_url: 'https://alerts.datingoptimizer.com'
+      
+    slack_configs:
+    - api_url: '${SLACK_WEBHOOK_URL}'
+      channel: '#alerts-critical'
+      username: 'AlertManager'
+      icon_emoji: ':rotating_light:'
+      title: 'CRITICAL ALERT'
+      text: |
+        {{ range .Alerts }}
+        *Alert:* {{ .Annotations.summary }}
+        *Service:* {{ .Labels.service }}
+        *Severity:* {{ .Labels.severity }}
+        *Description:* {{ .Annotations.description }}
+        *Instance:* {{ .Labels.instance }}
+        *Runbook:* {{ .Annotations.runbook_url }}
+        {{ end }}
+      send_resolved: true
+      
+    email_configs:
+    - to: 'devops-critical@datingoptimizer.com'
+      subject: 'CRITICAL: Dating Optimizer Alert - {{ .GroupLabels.alertname }}'
+      html: |
+        <h2>CRITICAL ALERT</h2>
+        {{ range .Alerts }}
+        <p><strong>Alert:</strong> {{ .Annotations.summary }}</p>
+        <p><strong>Service:</strong> {{ .Labels.service }}</p>
+        <p><strong>Description:</strong> {{ .Annotations.description }}</p>
+        <p><strong>Instance:</strong> {{ .Labels.instance }}</p>
+        <p><strong>Runbook:</strong> <a href="{{ .Annotations.runbook_url }}">{{ .Annotations.runbook_url }}</a></p>
+        <hr>
+        {{ end }}
+
+  # Database critical alerts
+  - name: 'database-critical'
+    pagerduty_configs:
+    - service_key: '${PAGERDUTY_DATABASE_KEY}'
+      description: 'DATABASE CRITICAL: {{ .CommonAnnotations.summary }}'
+      
+    slack_configs:
+    - api_url: '${SLACK_WEBHOOK_URL}'
+      channel: '#database-alerts'
+      username: 'DB AlertManager'
+      icon_emoji: ':database:'
+      title: 'DATABASE CRITICAL ALERT'
+      text: |
+        🚨 **DATABASE ISSUE DETECTED** 🚨
+        {{ range .Alerts }}
+        *Alert:* {{ .Annotations.summary }}
+        *Description:* {{ .Annotations.description }}
+        *Instance:* {{ .Labels.instance }}
+        {{ end }}
+
+  # API down alerts
+  - name: 'api-down'
+    pagerduty_configs:
+    - service_key: '${PAGERDUTY_API_KEY}'
+      description: 'API DOWN: Dating Profile Optimizer API is not responding'
+      
+    slack_configs:
+    - api_url: '${SLACK_WEBHOOK_URL}'
+      channel: '#api-alerts'
+      username: 'API AlertManager'
+      icon_emoji: ':exclamation:'
+      title: 'API DOWN ALERT'
+      text: |
+        🔴 **API IS DOWN** 🔴
+        The Dating Profile Optimizer API is not responding!
+        Immediate action required!
+
+  # Warning alerts - Slack + Email
+  - name: 'warning-alerts'
+    slack_configs:
+    - api_url: '${SLACK_WEBHOOK_URL}'
+      channel: '#alerts-warning'
+      username: 'AlertManager'
+      icon_emoji: ':warning:'
+      title: 'Warning Alert'
+      text: |
+        {{ range .Alerts }}
+        *Alert:* {{ .Annotations.summary }}
+        *Service:* {{ .Labels.service }}
+        *Description:* {{ .Annotations.description }}
+        *Instance:* {{ .Labels.instance }}
+        {{ end }}
+      send_resolved: true
+      
+    email_configs:
+    - to: 'devops@datingoptimizer.com'
+      subject: 'Warning: Dating Optimizer - {{ .GroupLabels.alertname }}'
+      html: |
+        <h2>Warning Alert</h2>
+        {{ range .Alerts }}
+        <p><strong>Alert:</strong> {{ .Annotations.summary }}</p>
+        <p><strong>Service:</strong> {{ .Labels.service }}</p>
+        <p><strong>Description:</strong> {{ .Annotations.description }}</p>
+        <p><strong>Instance:</strong> {{ .Labels.instance }}</p>
+        {{ end }}
+
+  # Business alerts - Slack + Email to business team
+  - name: 'business-alerts'
+    slack_configs:
+    - api_url: '${SLACK_WEBHOOK_URL}'
+      channel: '#business-metrics'
+      username: 'Business AlertManager'
+      icon_emoji: ':chart_with_upwards_trend:'
+      title: 'Business Metric Alert'
+      text: |
+        📊 **Business Metric Alert** 📊
+        {{ range .Alerts }}
+        *Alert:* {{ .Annotations.summary }}
+        *Description:* {{ .Annotations.description }}
+        {{ end }}
+      
+    email_configs:
+    - to: 'business@datingoptimizer.com,product@datingoptimizer.com'
+      subject: 'Business Metric Alert: {{ .GroupLabels.alertname }}'
+      html: |
+        <h2>Business Metric Alert</h2>
+        {{ range .Alerts }}
+        <p><strong>Alert:</strong> {{ .Annotations.summary }}</p>
+        <p><strong>Description:</strong> {{ .Annotations.description }}</p>
+        {{ end }}
+
+  # Security alerts - PagerDuty + Slack + Email
+  - name: 'security-alerts'
+    pagerduty_configs:
+    - service_key: '${PAGERDUTY_SECURITY_KEY}'
+      description: 'SECURITY: {{ .CommonAnnotations.summary }}'
+      
+    slack_configs:
+    - api_url: '${SLACK_WEBHOOK_URL}'
+      channel: '#security-alerts'
+      username: 'Security AlertManager'
+      icon_emoji: ':shield:'
+      title: 'Security Alert'
+      text: |
+        🛡️ **SECURITY ALERT** 🛡️
+        {{ range .Alerts }}
+        *Alert:* {{ .Annotations.summary }}
+        *Description:* {{ .Annotations.description }}
+        *Instance:* {{ .Labels.instance }}
+        {{ end }}
+      
+    email_configs:
+    - to: 'security@datingoptimizer.com,devops@datingoptimizer.com'
+      subject: 'SECURITY ALERT: {{ .GroupLabels.alertname }}'
+      html: |
+        <h2>Security Alert</h2>
+        {{ range .Alerts }}
+        <p><strong>Alert:</strong> {{ .Annotations.summary }}</p>
+        <p><strong>Description:</strong> {{ .Annotations.description }}</p>
+        <p><strong>Instance:</strong> {{ .Labels.instance }}</p>
+        {{ end }}
+
+  # Infrastructure alerts
+  - name: 'infrastructure-alerts'
+    slack_configs:
+    - api_url: '${SLACK_WEBHOOK_URL}'
+      channel: '#infrastructure'
+      username: 'Infrastructure AlertManager'
+      icon_emoji: ':gear:'
+      title: 'Infrastructure Alert'
+      text: |
+        ⚙️ **Infrastructure Alert** ⚙️
+        {{ range .Alerts }}
+        *Alert:* {{ .Annotations.summary }}
+        *Service:* {{ .Labels.service }}
+        *Description:* {{ .Annotations.description }}
+        *Instance:* {{ .Labels.instance }}
+        {{ end }}
+      
+    email_configs:
+    - to: 'infrastructure@datingoptimizer.com'
+      subject: 'Infrastructure Alert: {{ .GroupLabels.alertname }}'
+      html: |
+        <h2>Infrastructure Alert</h2>
+        {{ range .Alerts }}
+        <p><strong>Alert:</strong> {{ .Annotations.summary }}</p>
+        <p><strong>Service:</strong> {{ .Labels.service }}</p>
+        <p><strong>Description:</strong> {{ .Annotations.description }}</p>
+        <p><strong>Instance:</strong> {{ .Labels.instance }}</p>
+        {{ end }}
+
+# Inhibition rules to reduce noise
+inhibit_rules:
+  # If API is down, don't alert on high response time
+  - source_match:
+      alertname: APIEndpointDown
+    target_match:
+      alertname: HighResponseTime
+    equal: ['service']
+  
+  # If database is down, don't alert on connection issues
+  - source_match:
+      alertname: PostgreSQLDown
+    target_match:
+      alertname: HighDatabaseConnections
+    equal: ['instance']
+  
+  # If system has high CPU, don't alert on response time
+  - source_match:
+      alertname: HighCPUUsage
+    target_match:
+      alertname: HighResponseTime
+    equal: ['instance']
+
+# Notification templates
+templates:
+  - '/etc/alertmanager/templates/default.tmpl'
+  - '/etc/alertmanager/templates/slack.tmpl'
+  - '/etc/alertmanager/templates/email.tmpl'

@@ -1,0 +1,113 @@
+{
+  "passed": [
+    {
+      "endpoint": "/health",
+      "method": "GET",
+      "status": "PASS",
+      "message": "Server healthy, DB: connected",
+      "timestamp": "2025-08-11T03:36:50.636898",
+      "response_data": null
+    }
+  ],
+  "failed": [
+    {
+      "endpoint": "/api/auth/register",
+      "method": "POST",
+      "status": "FAIL",
+      "message": "Failed: Minimal Required Fields",
+      "timestamp": "2025-08-11T03:36:50.638391",
+      "response_data": null
+    },
+    {
+      "endpoint": "/api/auth/register",
+      "method": "POST",
+      "status": "FAIL",
+      "message": "Failed: Complete Profile Data",
+      "timestamp": "2025-08-11T03:36:50.639467",
+      "response_data": null
+    }
+  ],
+  "errors": [
+    {
+      "endpoint": "/api/bio/generate",
+      "method": "POST",
+      "status": "ERROR",
+      "message": "Connection failed - Bio generation",
+      "timestamp": "2025-08-11T03:36:50.640827",
+      "response_data": null
+    },
+    {
+      "endpoint": "/api/bio/history",
+      "method": "GET",
+      "status": "ERROR",
+      "message": "Connection failed - Bio history",
+      "timestamp": "2025-08-11T03:36:50.642061",
+      "response_data": null
+    },
+    {
+      "endpoint": "/api/analytics/track",
+      "method": "POST",
+      "status": "ERROR",
+      "message": "Connection failed - Analytics tracking",
+      "timestamp": "2025-08-11T03:36:50.643280",
+      "response_data": null
+    },
+    {
+      "endpoint": "/api/analytics/report",
+      "method": "GET",
+      "status": "ERROR",
+      "message": "Connection failed - Analytics report",
+      "timestamp": "2025-08-11T03:36:50.644276",
+      "response_data": null
+    },
+    {
+      "endpoint": "/api/profile",
+      "method": "GET",
+      "status": "ERROR",
+      "message": "Connection failed - Get profile - testing direct path",
+      "timestamp": "2025-08-11T03:36:50.645236",
+      "response_data": null
+    },
+    {
+      "endpoint": "/api/profile",
+      "method": "PUT",
+      "status": "ERROR",
+      "message": "Connection failed - Update profile - testing direct path",
+      "timestamp": "2025-08-11T03:36:50.646520",
+      "response_data": null
+    },
+    {
+      "endpoint": "/api/linkedin-headshot/generate",
+      "method": "POST",
+      "status": "ERROR",
+      "message": "Connection failed - LinkedIn headshot generation",
+      "timestamp": "2025-08-11T03:36:50.647558",
+      "response_data": null
+    },
+    {
+      "endpoint": "/api/linkedin-headshot/history",
+      "method": "GET",
+      "status": "ERROR",
+      "message": "Connection failed - LinkedIn headshot history",
+      "timestamp": "2025-08-11T03:36:50.648536",
+      "response_data": null
+    },
+    {
+      "endpoint": "/api/photo-analysis/analyze",
+      "method": "POST",
+      "status": "ERROR",
+      "message": "Connection failed - Photo analysis",
+      "timestamp": "2025-08-11T03:36:50.649664",
+      "response_data": null
+    },
+    {
+      "endpoint": "/api/photo-analysis/history",
+      "method": "GET",
+      "status": "ERROR",
+      "message": "Connection failed - Photo analysis history",
+      "timestamp": "2025-08-11T03:36:50.650922",
+      "response_data": null
+    }
+  ],
+  "skipped": []
+}

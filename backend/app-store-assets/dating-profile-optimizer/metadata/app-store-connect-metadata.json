@@ -1,0 +1,145 @@
+{
+  "appInformation": {
+    "bundleId": "com.xciterr.datingprofileoptimizer",
+    "appName": "Dating Profile Optimizer",
+    "subtitle": "AI-Powered Dating Success",
+    "category": "Lifestyle",
+    "contentRating": "17+",
+    "developerName": "Xciterr Ltd",
+    "supportURL": "https://www.datingprofileoptimizer.com/support",
+    "privacyPolicyURL": "https://www.xciterr.com/privacy-policy",
+    "termsOfUseURL": "https://www.xciterr.com/terms-of-service"
+  },
+  "versionInformation": {
+    "versionString": "1.0",
+    "buildNumber": "1.0.1",
+    "copyright": "© 2024 Xciterr Ltd. All rights reserved.",
+    "releaseType": "Manual Release"
+  },
+  "appStoreDescription": {
+    "description": "Transform your dating game with AI-powered photo analysis and bio generation. Dating Profile Optimizer uses advanced artificial intelligence to analyze your photos, suggest improvements, and create compelling bios that get more matches on Tinder, Bumble, and Hinge.\n\n🤖 AI PHOTO ANALYSIS\n• Instant photo scoring and feedback\n• Lighting, angle, and composition tips\n• Facial expression optimization\n• Background and outfit suggestions\n\n❤️ SMART BIO GENERATION\n• AI-crafted bios based on your interests\n• Multiple style options (funny, serious, creative)\n• Personality-driven content\n• A/B testing suggestions\n\n📊 PERFORMANCE TRACKING\n• Match rate monitoring\n• Success metrics dashboard\n• Progress tracking over time\n• Data-driven insights\n\n🔥 PROFILE OPTIMIZATION\n• Photo ordering recommendations\n• Profile completeness checker\n• Dating app-specific advice\n• Expert tips and strategies\n\n✅ PROVEN RESULTS: Users see 3x more matches on average\n✅ PRIVACY FIRST: All analysis happens on-device\n✅ EXPERT BACKED: Developed with dating coaches\n✅ MULTI-PLATFORM: Works with all major dating apps\n\nPREMIUM FEATURES:\n• Unlimited photo analyses\n• Advanced bio templates\n• Priority customer support\n• Weekly performance reports\n• Early access to new features\n\nWhether you're new to online dating or looking to improve your existing profile, Dating Profile Optimizer gives you the tools and insights to succeed. Our AI technology, combined with expert dating advice, helps you present your best self and find meaningful connections.\n\nCOMPATIBLE WITH: Tinder, Bumble, Hinge, Coffee Meets Bagel, OkCupid, Plenty of Fish, Match.com, and more.\n\nDownload now and start getting the matches you deserve!",
+    "keywords": "dating,tinder,bumble,hinge,profile,photo,bio,matches,AI,optimization,dating app,relationship",
+    "whatsNew": "🔥 NEW in Version 1.0:\n\n• Launch of Dating Profile Optimizer with AI-powered features\n• Instant photo analysis with personalized feedback\n• AI bio generation with multiple style options\n• Success tracking dashboard with detailed metrics\n• Privacy-first approach with on-device processing\n• Support for all major dating apps\n• Expert tips and dating advice\n• Free tier with premium upgrade options\n\nWelcome to the future of dating success! Start your journey to 3x more matches today."
+  },
+  "screenshots": {
+    "iPhone67": {
+      "required": true,
+      "maxCount": 10,
+      "dimensions": "1290x2796",
+      "descriptions": [
+        "AI-Powered Dating Success - Transform your profile with intelligent analysis",
+        "Instant Photo Scoring - Get personalized feedback on your dating photos",
+        "Smart Bio Generation - AI creates compelling bios that get matches", 
+        "Track Your Success - Monitor match rates and dating performance",
+        "Premium Features - Unlock unlimited analyses and advanced tools"
+      ]
+    },
+    "iPhone65": {
+      "required": true,
+      "maxCount": 10,
+      "dimensions": "1284x2778",
+      "descriptions": [
+        "Welcome to Dating Profile Optimizer - Your AI dating coach",
+        "Photo Analysis Demo - See how AI improves your dating photos",
+        "Bio Creation Interface - Generate bios that reflect your personality",
+        "Results Dashboard - Track your dating success over time",
+        "Subscription Options - Choose the plan that works for you"
+      ]
+    },
+    "iPhone55": {
+      "required": false,
+      "maxCount": 10,
+      "dimensions": "1242x2208",
+      "descriptions": [
+        "AI Dating Coach in your pocket",
+        "Transform photos with intelligent feedback",
+        "Create bios that get conversations started",
+        "See your dating success improve",
+        "Premium features for serious daters"
+      ]
+    },
+    "iPad": {
+      "required": false,
+      "maxCount": 10,
+      "dimensions": "2048x2732",
+      "descriptions": [
+        "Full-featured dating optimization on iPad",
+        "Detailed photo analysis with large screen clarity",
+        "Bio creation with expanded interface",
+        "Comprehensive success tracking dashboard",
+        "Premium subscription management"
+      ]
+    }
+  },
+  "appPreview": {
+    "iPhone67": {
+      "maxDuration": 30,
+      "dimensions": "1290x2796",
+      "description": "See how AI transforms dating profiles for 3x more matches"
+    },
+    "iPhone65": {
+      "maxDuration": 30,
+      "dimensions": "1284x2778", 
+      "description": "Dating Profile Optimizer in action - AI analysis and bio generation"
+    }
+  },
+  "pricing": {
+    "basePrice": "Free",
+    "subscriptions": [
+      {
+        "name": "Premium Monthly",
+        "price": "$9.99",
+        "period": "1 month",
+        "features": [
+          "Unlimited photo analyses",
+          "Advanced bio templates",
+          "Priority customer support",
+          "Weekly performance reports",
+          "Early access to new features"
+        ]
+      },
+      {
+        "name": "Premium Annual",
+        "price": "$59.99",
+        "period": "1 year",
+        "savings": "50%",
+        "features": [
+          "All Premium Monthly features",
+          "Best value - 50% savings",
+          "Annual performance review",
+          "Exclusive dating insights"
+        ]
+      }
+    ]
+  },
+  "ageRating": {
+    "rating": "17+",
+    "reasons": [
+      "Mature/Suggestive Themes - App focuses on dating and romantic relationships"
+    ],
+    "description": "This app is designed for adults seeking romantic relationships and contains mature themes related to dating and attraction."
+  },
+  "localization": {
+    "primaryLanguage": "en-US",
+    "supportedLanguages": [
+      "en-US",
+      "es-ES", 
+      "fr-FR",
+      "de-DE"
+    ]
+  },
+  "appStoreConnect": {
+    "appReviewInformation": {
+      "contactEmail": "support@xciterr.com",
+      "contactPhone": "+44 20 7xxx xxxx",
+      "notes": "This app uses AI to analyze dating photos and generate bios. All photo analysis happens on-device for privacy. The app includes subscription features for premium functionality. Demo account credentials: demo@xciterr.com / DemoUser2024"
+    },
+    "testInformation": {
+      "demoAccount": {
+        "username": "demo@xciterr.com",
+        "password": "DemoUser2024"
+      },
+      "notes": "App can be fully tested without creating an account. Premium features have a free trial period. No special setup required for review."
+    }
+  }
+}

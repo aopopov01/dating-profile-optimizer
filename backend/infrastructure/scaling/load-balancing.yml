@@ -1,0 +1,571 @@
+# Load Balancing Configuration for Dating Profile Optimizer
+# Multi-tier load balancing with geographic distribution and intelligent routing
+
+load_balancing:
+  # Global load balancing (DNS-based)
+  global:
+    # DNS-based load balancing
+    dns_lb:
+      provider: "route53"
+      health_checks: true
+      failover_strategy: "priority"
+      
+      # Geographic routing
+      geographic_routing:
+        enabled: true
+        regions:
+          # North America
+          north_america:
+            primary: "us-east-1"
+            backup: "us-west-2"
+            health_check: "/health"
+            
+          # Europe
+          europe:
+            primary: "eu-west-1"
+            backup: "eu-central-1"
+            health_check: "/health"
+            
+          # Asia Pacific
+          asia_pacific:
+            primary: "ap-southeast-1"
+            backup: "ap-northeast-1"
+            health_check: "/health"
+            
+      # Latency-based routing
+      latency_routing:
+        enabled: true
+        measurement_intervals: "1m"
+        threshold: "100ms"
+        
+      # Weighted routing policies
+      weighted_routing:
+        # Production traffic distribution
+        production:
+          us_east_1: 60
+          us_west_2: 25
+          eu_west_1: 15
+          
+        # Canary deployment weights
+        canary:
+          current_version: 90
+          new_version: 10
+          
+    # Global Server Load Balancing (GSLB)
+    gslb:
+      provider: "cloudflare"
+      steering_policy: "dynamic"
+      
+      # Pool configuration
+      pools:
+        # Primary pool (US East)
+        primary_us_east:
+          name: "us-east-primary"
+          origins:
+            - address: "api-1.us-east-1.datingoptimizer.com"
+              weight: 1
+            - address: "api-2.us-east-1.datingoptimizer.com"
+              weight: 1
+            - address: "api-3.us-east-1.datingoptimizer.com"
+              weight: 1
+          health_check:
+            path: "/health"
+            interval: 30
+            retries: 3
+            timeout: 10
+            
+        # Secondary pool (US West)
+        secondary_us_west:
+          name: "us-west-secondary"
+          origins:
+            - address: "api-1.us-west-2.datingoptimizer.com"
+              weight: 1
+            - address: "api-2.us-west-2.datingoptimizer.com"
+              weight: 1
+          health_check:
+            path: "/health"
+            interval: 30
+            retries: 3
+            timeout: 10
+            
+        # European pool
+        europe_pool:
+          name: "eu-primary"
+          origins:
+            - address: "api-1.eu-west-1.datingoptimizer.com"
+              weight: 1
+            - address: "api-2.eu-west-1.datingoptimizer.com"
+              weight: 1
+          health_check:
+            path: "/health"
+            interval: 30
+            retries: 3
+            timeout: 10
+
+  # Regional load balancing (Application Load Balancer)
+  regional:
+    # AWS Application Load Balancer
+    alb:
+      # Listener configuration
+      listeners:
+        # HTTPS listener
+        https:
+          port: 443
+          protocol: "HTTPS"
+          ssl_policy: "ELBSecurityPolicy-TLS-1-2-2017-01"
+          certificate_arn: "arn:aws:acm:region:account:certificate/cert-id"
+          
+          # Default action
+          default_action:
+            type: "forward"
+            target_group: "dating-api-production"
+            
+          # Rules for advanced routing
+          rules:
+            # API versioning
+            - priority: 100
+              condition:
+                field: "http-header"
+                http_header_config:
+                  http_header_name: "API-Version"
+                  values: ["v2"]
+              action:
+                type: "forward"
+                target_group: "dating-api-v2"
+                
+            # Canary deployment
+            - priority: 200
+              condition:
+                field: "http-header"
+                http_header_config:
+                  http_header_name: "X-Canary"
+                  values: ["true"]
+              action:
+                type: "forward"
+                target_group: "dating-api-canary"
+                
+            # Admin endpoints
+            - priority: 300
+              condition:
+                field: "path-pattern"
+                path_pattern_config:
+                  values: ["/admin/*"]
+              action:
+                type: "forward"
+                target_group: "dating-admin-api"
+                
+        # HTTP listener (redirect to HTTPS)
+        http:
+          port: 80
+          protocol: "HTTP"
+          default_action:
+            type: "redirect"
+            redirect_config:
+              protocol: "HTTPS"
+              port: "443"
+              status_code: "HTTP_301"
+              
+      # Target groups
+      target_groups:
+        # Main production API
+        dating_api_production:
+          name: "dating-api-prod"
+          port: 3000
+          protocol: "HTTP"
+          target_type: "instance"
+          
+          # Health check configuration
+          health_check:
+            enabled: true
+            path: "/health"
+            protocol: "HTTP"
+            port: "traffic-port"
+            healthy_threshold_count: 2
+            unhealthy_threshold_count: 3
+            timeout: 5
+            interval: 30
+            matcher: "200"
+            
+          # Stickiness (disabled for stateless design)
+          stickiness:
+            enabled: false
+            
+          # Connection draining
+          deregistration_delay: 60
+          
+        # Canary deployment target group
+        dating_api_canary:
+          name: "dating-api-canary"
+          port: 3000
+          protocol: "HTTP"
+          target_type: "instance"
+          health_check:
+            enabled: true
+            path: "/health"
+            healthy_threshold_count: 2
+            unhealthy_threshold_count: 2
+            timeout: 5
+            interval: 15  # More frequent checks for canary
+            
+        # Admin API target group
+        dating_admin_api:
+          name: "dating-admin-api"
+          port: 3001
+          protocol: "HTTP"
+          target_type: "instance"
+          health_check:
+            enabled: true
+            path: "/admin/health"
+            
+    # Load balancer attributes
+    attributes:
+      # Access logs
+      access_logs:
+        enabled: true
+        s3_bucket: "dating-optimizer-alb-logs"
+        s3_prefix: "production"
+        
+      # Connection settings
+      connection:
+        idle_timeout: 60
+        
+      # Deletion protection
+      deletion_protection: true
+      
+      # Cross-zone load balancing
+      cross_zone: true
+
+  # Service mesh load balancing (Istio/Envoy)
+  service_mesh:
+    # Istio configuration
+    istio:
+      enabled: false  # Future consideration
+      
+      # Virtual services
+      virtual_services:
+        dating_api:
+          hosts:
+            - "api.datingoptimizer.com"
+          http:
+            - match:
+                - uri:
+                    prefix: "/api/v1"
+              route:
+                - destination:
+                    host: "dating-api-v1"
+                    subset: "stable"
+                  weight: 90
+                - destination:
+                    host: "dating-api-v1"
+                    subset: "canary"
+                  weight: 10
+                  
+      # Destination rules
+      destination_rules:
+        dating_api:
+          host: "dating-api-v1"
+          traffic_policy:
+            load_balancer:
+              simple: "LEAST_CONN"
+            connection_pool:
+              tcp:
+                max_connections: 100
+              http:
+                http1_max_pending_requests: 50
+                http2_max_requests: 100
+                max_requests_per_connection: 10
+            circuit_breaker:
+              consecutive_errors: 5
+              interval: 30s
+              base_ejection_time: 30s
+              
+          subsets:
+            - name: "stable"
+              labels:
+                version: "stable"
+            - name: "canary"
+              labels:
+                version: "canary"
+
+  # Container-level load balancing (Kubernetes)
+  kubernetes:
+    # Service configuration
+    services:
+      # ClusterIP service for internal communication
+      internal_service:
+        type: "ClusterIP"
+        ports:
+          - name: "http"
+            port: 80
+            target_port: 3000
+            protocol: "TCP"
+        selector:
+          app: "dating-api"
+          
+      # LoadBalancer service for external access
+      external_service:
+        type: "LoadBalancer"
+        ports:
+          - name: "https"
+            port: 443
+            target_port: 3000
+            protocol: "TCP"
+        selector:
+          app: "dating-api"
+        load_balancer_source_ranges:
+          - "0.0.0.0/0"  # Allow all (will be restricted by security groups)
+          
+    # Ingress configuration
+    ingress:
+      # NGINX Ingress Controller
+      nginx_ingress:
+        enabled: true
+        class: "nginx"
+        
+        # SSL configuration
+        tls:
+          - hosts:
+              - "api.datingoptimizer.com"
+            secret_name: "dating-api-tls"
+            
+        # Rules
+        rules:
+          - host: "api.datingoptimizer.com"
+            http:
+              paths:
+                - path: "/"
+                  path_type: "Prefix"
+                  backend:
+                    service:
+                      name: "dating-api"
+                      port:
+                        number: 80
+                        
+        # Annotations for advanced configuration
+        annotations:
+          # Load balancing method
+          nginx.ingress.kubernetes.io/load-balance: "least_conn"
+          
+          # Session affinity (disabled)
+          nginx.ingress.kubernetes.io/affinity: "none"
+          
+          # Rate limiting
+          nginx.ingress.kubernetes.io/rate-limit: "100"
+          nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+          
+          # SSL redirect
+          nginx.ingress.kubernetes.io/ssl-redirect: "true"
+          
+          # CORS
+          nginx.ingress.kubernetes.io/enable-cors: "true"
+          nginx.ingress.kubernetes.io/cors-allow-origin: "https://app.datingoptimizer.com"
+          
+          # Timeout
+          nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+          nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+          
+          # Buffer sizes
+          nginx.ingress.kubernetes.io/proxy-buffer-size: "8k"
+          nginx.ingress.kubernetes.io/proxy-buffers-number: "8"
+
+  # Advanced load balancing features
+  advanced_features:
+    # Circuit breaker
+    circuit_breaker:
+      enabled: true
+      failure_threshold: 5
+      timeout: 30s
+      half_open_max_calls: 3
+      half_open_timeout: 60s
+      
+    # Retry policies
+    retry_policies:
+      max_retries: 3
+      retry_timeout: 10s
+      retry_conditions:
+        - "5xx"
+        - "connect-failure"
+        - "refused-stream"
+        
+    # Outlier detection
+    outlier_detection:
+      enabled: true
+      consecutive_5xx: 3
+      consecutive_gateway_failure: 3
+      interval: 30s
+      base_ejection_time: 30s
+      max_ejection_percent: 50
+      
+    # Load balancing algorithms
+    algorithms:
+      # Primary algorithm
+      primary: "least_connections"
+      
+      # Available algorithms
+      available:
+        - "round_robin"
+        - "least_connections"
+        - "ip_hash"
+        - "weighted_round_robin"
+        - "least_response_time"
+        
+    # Health checking
+    health_checks:
+      # Application health check
+      application:
+        path: "/health"
+        method: "GET"
+        interval: 30s
+        timeout: 5s
+        healthy_threshold: 2
+        unhealthy_threshold: 3
+        
+      # Detailed health check
+      detailed:
+        path: "/health/detailed"
+        method: "GET"
+        interval: 60s
+        timeout: 10s
+        healthy_threshold: 2
+        unhealthy_threshold: 5
+        
+    # Traffic shaping
+    traffic_shaping:
+      # Rate limiting
+      rate_limiting:
+        requests_per_second: 100
+        burst_size: 50
+        
+      # Traffic mirroring
+      traffic_mirroring:
+        enabled: false  # Enable for testing
+        mirror_percent: 10
+        mirror_destination: "testing-environment"
+        
+      # A/B testing
+      ab_testing:
+        enabled: true
+        experiments:
+          - name: "new_ui_flow"
+            traffic_split: 10  # 10% to new flow
+            conditions:
+              - header: "User-Agent"
+                contains: "Mobile"
+
+# Monitoring and observability
+monitoring:
+  # Load balancer metrics
+  metrics:
+    # Key performance indicators
+    kpis:
+      - request_count
+      - response_time_percentiles
+      - error_rate
+      - active_connections
+      - target_health_status
+      
+    # Detailed metrics
+    detailed:
+      - requests_per_target
+      - connection_errors
+      - target_response_time
+      - unhealthy_target_count
+      - new_connection_count
+      
+  # Alerting
+  alerts:
+    # Critical alerts
+    critical:
+      - alert: "LoadBalancerDown"
+        condition: "up == 0"
+        duration: "1m"
+        
+      - alert: "HighErrorRate"
+        condition: "error_rate > 5"
+        duration: "5m"
+        
+      - alert: "AllTargetsUnhealthy"
+        condition: "healthy_targets == 0"
+        duration: "1m"
+        
+    # Warning alerts
+    warning:
+      - alert: "HighResponseTime"
+        condition: "response_time_p95 > 2000"
+        duration: "10m"
+        
+      - alert: "UnhealthyTargets"
+        condition: "unhealthy_targets > 1"
+        duration: "5m"
+        
+  # Logging
+  logging:
+    # Access logs
+    access_logs:
+      enabled: true
+      format: "json"
+      fields:
+        - timestamp
+        - client_ip
+        - request_method
+        - request_uri
+        - response_status
+        - response_time
+        - target_ip
+        - target_status
+        
+    # Error logs
+    error_logs:
+      enabled: true
+      level: "warn"
+      
+# Security considerations
+security:
+  # DDoS protection
+  ddos_protection:
+    enabled: true
+    provider: "aws_shield"
+    
+    # Rate limiting
+    rate_limits:
+      global: "1000/min"
+      per_ip: "100/min"
+      burst: 50
+      
+  # SSL/TLS termination
+  ssl_termination:
+    enabled: true
+    min_tls_version: "1.2"
+    cipher_suites: "secure"
+    
+  # Web Application Firewall
+    waf:
+      enabled: true
+      rules:
+        - sql_injection_protection
+        - xss_protection
+        - bad_bot_protection
+        - rate_limiting
+        
+# Cost optimization
+cost_optimization:
+  # Instance types
+  instance_optimization:
+    # Use appropriate instance sizes
+    right_sizing: true
+    
+    # Reserved instances for predictable load
+    reserved_instances:
+      percentage: 60
+      term: "1_year"
+      
+  # Traffic optimization
+  traffic_optimization:
+    # Enable compression
+    compression: true
+    
+    # Optimize routing
+    intelligent_routing: true
+    
+    # Cache static content
+    static_caching: true

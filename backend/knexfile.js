@@ -1,5 +1,5 @@
 const path = require('path');
-require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
 /**
  * Optimized Knex Configuration for Dating Profile Optimizer
@@ -15,13 +15,7 @@ module.exports = {
       user: process.env.DB_USER || 'postgres',
       password: process.env.DB_PASSWORD || 'password',
       charset: 'utf8',
-      timezone: 'UTC',
-      // Development optimizations
-      options: {
-        encrypt: false,
-        enableArithAbort: true,
-        trustServerCertificate: true
-      }
+      timezone: 'UTC'
     },
     migrations: {
       directory: path.join(__dirname, 'migrations'),
@@ -83,11 +77,7 @@ module.exports = {
       user: process.env.DB_USER || 'postgres',
       password: process.env.DB_PASSWORD || 'password',
       charset: 'utf8',
-      timezone: 'UTC',
-      options: {
-        encrypt: false,
-        enableArithAbort: true
-      }
+      timezone: 'UTC'
     },
     migrations: {
       directory: path.join(__dirname, 'migrations'),

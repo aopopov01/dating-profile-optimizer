@@ -1,0 +1,148 @@
+{
+  "appInformation": {
+    "bundleId": "com.xciterr.linkedinheadshotgenerator", 
+    "appName": "LinkedIn Headshot Generator",
+    "subtitle": "AI Professional Photo Editor",
+    "category": "Business",
+    "contentRating": "4+",
+    "developerName": "Xciterr Ltd",
+    "supportURL": "https://www.linkedinheadshotgenerator.com/support",
+    "privacyPolicyURL": "https://www.xciterr.com/privacy-policy",
+    "termsOfUseURL": "https://www.xciterr.com/terms-of-service"
+  },
+  "versionInformation": {
+    "versionString": "1.0",
+    "buildNumber": "1.0.1", 
+    "copyright": "© 2024 Xciterr Ltd. All rights reserved.",
+    "releaseType": "Manual Release"
+  },
+  "appStoreDescription": {
+    "description": "Create stunning professional headshots with AI-powered photo enhancement. LinkedIn Headshot Generator transforms your selfies into polished, executive-quality photos perfect for LinkedIn, resumes, business cards, and professional profiles.\n\n📸 AI PHOTO ENHANCEMENT\n• Professional lighting adjustment\n• Background replacement and blur\n• Skin tone and blemish correction\n• Eye brightness and clarity enhancement\n• Automatic cropping and framing\n\n👔 PROFESSIONAL STYLING\n• Virtual suit and business attire overlay\n• Hair styling and grooming touch-ups\n• Color coordination and balance\n• Executive presence optimization\n• Industry-specific customization\n\n🏢 BUSINESS BACKGROUNDS\n• Office environments and settings\n• Neutral professional backdrops\n• Corporate and executive themes\n• Custom branding integration\n• High-resolution output (up to 4K)\n\n📊 PROFILE ANALYSIS\n• LinkedIn profile optimization tips\n• Professional impression scoring\n• Industry-specific recommendations\n• Networking effectiveness insights\n• Personal branding guidance\n\n✅ STUDIO QUALITY: Professional results without the studio cost\n✅ INSTANT RESULTS: Transform photos in seconds\n✅ PRIVACY SECURE: All processing happens on your device\n✅ CAREER FOCUSED: Designed for professional success\n✅ EXPERT APPROVED: Reviewed by career coaches and recruiters\n\nPREMIUM FEATURES:\n• Unlimited high-resolution exports\n• Advanced editing tools and filters\n• Custom background uploads\n• Bulk photo processing\n• Priority customer support\n• Watermark removal\n\nPERFECT FOR:\n• LinkedIn profile photos\n• Resume and CV headshots\n• Business card photos\n• Corporate website profiles\n• Professional networking\n• Job applications\n• Speaking engagements\n• Company directories\n\nWhether you're job hunting, building your professional brand, or updating your LinkedIn profile, LinkedIn Headshot Generator helps you make a powerful first impression. Our AI technology ensures you look confident, approachable, and professional in every photo.\n\nINDUSTRIES SUPPORTED: Technology, Finance, Healthcare, Legal, Consulting, Marketing, Sales, Real Estate, Education, and more.\n\nDownload now and elevate your professional image!",
+    "keywords": "linkedin,headshot,professional,photo,business,resume,AI,career,networking,corporate,job",
+    "whatsNew": "🚀 NEW in Version 1.0:\n\n• Launch of LinkedIn Headshot Generator with professional AI features\n• Studio-quality photo enhancement with intelligent lighting\n• Professional background library with office environments\n• Business attire overlay and grooming optimization\n• High-resolution exports up to 4K quality\n• LinkedIn profile integration and optimization\n• Industry-specific professional styling\n• Privacy-first processing with on-device enhancement\n• Free tier with premium professional features\n\nWelcome to professional photography reimagined! Transform your career image today."
+  },
+  "screenshots": {
+    "iPhone67": {
+      "required": true,
+      "maxCount": 10,
+      "dimensions": "1290x2796",
+      "descriptions": [
+        "Professional AI Photo Enhancement - Transform selfies into executive headshots",
+        "Studio-Quality Results - Professional lighting and background optimization",
+        "Business Attire Styling - Virtual suit overlay and grooming enhancement",
+        "Professional Backgrounds - Choose from premium corporate environments", 
+        "Career Impact Tracking - Monitor professional networking success"
+      ]
+    },
+    "iPhone65": {
+      "required": true,
+      "maxCount": 10,
+      "dimensions": "1284x2778",
+      "descriptions": [
+        "Welcome to LinkedIn Headshot Generator - Your professional photographer",
+        "Before/After Transformation - See the dramatic professional improvement",
+        "AI Editing Interface - Professional enhancement tools and controls",
+        "Background Selection - Premium office and corporate environments",
+        "Export Options - Multiple formats for all professional needs"
+      ]
+    },
+    "iPhone55": {
+      "required": false,
+      "maxCount": 10,
+      "dimensions": "1242x2208",
+      "descriptions": [
+        "Professional headshots made simple",
+        "AI-powered photo transformation",
+        "Business-ready results in seconds",
+        "Premium corporate backgrounds",
+        "Executive-level photo quality"
+      ]
+    },
+    "iPad": {
+      "required": false,
+      "maxCount": 10,
+      "dimensions": "2048x2732",
+      "descriptions": [
+        "Full professional editing suite on iPad",
+        "Detailed photo enhancement with large screen precision",
+        "Comprehensive background library and customization",
+        "Professional export options with preview",
+        "Executive subscription management interface"
+      ]
+    }
+  },
+  "appPreview": {
+    "iPhone67": {
+      "maxDuration": 30,
+      "dimensions": "1290x2796",
+      "description": "See how AI creates studio-quality professional headshots from selfies"
+    },
+    "iPhone65": {
+      "maxDuration": 30, 
+      "dimensions": "1284x2778",
+      "description": "LinkedIn Headshot Generator - Professional photo transformation in action"
+    }
+  },
+  "pricing": {
+    "basePrice": "Free",
+    "subscriptions": [
+      {
+        "name": "Executive Premium",
+        "price": "$19.99",
+        "period": "1 month",
+        "features": [
+          "Unlimited professional headshot generation",
+          "Premium corporate backgrounds",
+          "Advanced editing tools and customization",
+          "Multiple export formats and resolutions",
+          "Priority professional support",
+          "Bulk processing capabilities"
+        ]
+      },
+      {
+        "name": "Executive Annual",
+        "price": "$119.99",
+        "period": "1 year",
+        "savings": "50%",
+        "features": [
+          "All Executive Premium features",
+          "Best value - 50% annual savings",
+          "Quarterly professional photo updates",
+          "Executive branding consultations",
+          "Priority feature access"
+        ]
+      }
+    ]
+  },
+  "ageRating": {
+    "rating": "4+",
+    "reasons": [
+      "No Objectionable Content - Professional photo editing application"
+    ],
+    "description": "This app is designed for professional photo enhancement and contains no objectionable content. Suitable for all business professionals."
+  },
+  "localization": {
+    "primaryLanguage": "en-US",
+    "supportedLanguages": [
+      "en-US",
+      "es-ES",
+      "fr-FR", 
+      "de-DE",
+      "zh-CN"
+    ]
+  },
+  "appStoreConnect": {
+    "appReviewInformation": {
+      "contactEmail": "professional@xciterr.com",
+      "contactPhone": "+44 20 7xxx xxxx", 
+      "notes": "This app uses AI to enhance photos for professional use. All photo processing happens on-device for privacy and security. The app includes subscription features for premium business functionality. Demo account credentials: demo.professional@xciterr.com / ProfDemo2024"
+    },
+    "testInformation": {
+      "demoAccount": {
+        "username": "demo.professional@xciterr.com",
+        "password": "ProfDemo2024"
+      },
+      "notes": "App can be fully tested without creating an account. Premium features include a free professional trial period. Sample professional photos are provided for testing enhancement features."
+    }
+  }
+}
